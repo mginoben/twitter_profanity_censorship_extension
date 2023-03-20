@@ -1,5 +1,5 @@
 {
-  "name": "Twitter Tagalog Profanity Censorship",
+  "name": "Twitter Profanity",
   "description": "A simple Chrome extension to get the highlighted text on any website.",
   "version": "1.0",
   "manifest_version": 3,
