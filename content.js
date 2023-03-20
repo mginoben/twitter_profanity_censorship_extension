@@ -66,8 +66,3 @@ var intervalId = setInterval(function() {
 	  censor();
 	}
 }, 1000);
-  
-  
-
-
-
