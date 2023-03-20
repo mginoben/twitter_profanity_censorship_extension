@@ -36,17 +36,15 @@ function replace(tweet) {
 
 
 function censor() {
+    // Get all tweets using jquery
 	const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-
+    // Loop through tweets
 	tweets.forEach(tweet => {
-		
 		const textElement = tweet.querySelector('[data-testid="tweet"] [lang]');
-		
 		if (textElement && !textElement.classList.contains("censored")) {
-
+            // Get tweet text element
 			const tweet_text = textElement.textContent;
-			// console.log(predict(tweet_text));
-			
+            // Apply preddictions to each tweet
 			predict(tweet_text).then((response) => {
 				if (response == "Abusive"){
 					console.log("Censoring...");
@@ -54,20 +52,13 @@ function censor() {
 					replace(tweet); 
 				}
 			});
-
-			// if (predict(tweet_text) == "Abusive") {
-			// 	console.log("Censoring...");
-			// 	console.log(predict(tweet_text));
-			// 	replace(tweet); 
-			// }
-
+            // Add 'censored' class to tweet element to avoid infinite prediction
 			textElement.classList.add("censored");
 		}
-		
 	});
 }
 
-// Loop function every 1 sec
+// Prediction loop (1 sec interval)
 var intervalId = setInterval(function() {
 	if (typeof twttr !== 'undefined' && twttr.widgets && twttr.widgets.load) {
 	  clearInterval(intervalId);
