@@ -1,5 +1,5 @@
 const profanities = ['bobo', 'bwiset', 'gago', 'kupal', 'pakshet', 'pakyu', 'pucha', 
-'punyeta', 'puta', 'putangina', 'tanga', 'tangina', 'tarantado',
+'punyeta', 'puta', 'putangina', 'putang ina', 'tanga', 'tangina', 'tarantado',
 'ulol']
 
 async function predict(text) {
@@ -27,8 +27,19 @@ function replace(tweet) {
 	var tweet_content = tweet.innerHTML;
 	// Replace profanities in *****
 	profanities.forEach(function (profanity, index) {
-		var word_pattern = new RegExp(profanity, 'gi');
-		tweet_content = tweet_content.replace(word_pattern, "*****");
+		// Get the exact match of profane word
+		var profane_word = new RegExp(`\\b${profanity}\\b`, "gi");
+		// Masking for profane word
+		var mask = "";
+		for (let i = 0; i < profanity.length; i++) {
+			if (profanity[i] === " ") {
+				mask += " ";
+			} else {
+				mask += "*";
+			}
+		}
+		// Replace
+		tweet_content = tweet_content.replace(profane_word, mask);
 	});
 	// Replace the main tweet content
 	tweet.innerHTML = tweet_content;
