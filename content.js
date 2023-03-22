@@ -1,23 +1,35 @@
 const profanities = ['bobo', 'bwiset', 'gago', 'kupal', 'pakshet', 'pakyu', 'pucha', 
-'punyeta', 'puta', 'putangina', 'putang ina', 'tanga', 'tangina', 'tarantado',
+'punyeta', 'puta', 'putangina', 'putang ina', 'tanga', 'tangina', 'tarantado', 'bobong',
 'ulol']
+var censor_count = 0;
 
 async function predict(text) {
-	
-	const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			data: [
-				text,
-			]
-		})
-	});
+	try {
+		const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				data: [
+					text,
+				]
+			})
+		});
 
-	const data = await response.json();
-	label = data["data"][0]["label"]; 
-	
-	return await label;
+		const data = await response.json();
+		
+		if ("error" in data) {
+			console.log("Loading model please wait...");
+			predict(text);
+		}
+		else {
+			label = data["data"][0]["label"]; 
+			return await label;
+		}
+	}
+	catch(err){
+		console.log("Cannot reach model...")
+		return "error_model";
+	}
 }
 
 
@@ -58,9 +70,9 @@ function censor() {
             // Apply preddictions to each tweet
 			predict(tweet_text).then((response) => {
 				if (response == "Abusive"){
-					console.log("Censoring...");
-					console.log(tweet_text);
+					console.log("Censoring..." + tweet_text);
 					replace(tweet); 
+					censor_count += 1;
 				}
 			});
             // Add 'censored' class to tweet element to avoid infinite prediction
@@ -69,11 +81,15 @@ function censor() {
 	});
 }
 
+
 // Prediction loop (1 sec interval)
 var intervalId = setInterval(function() {
 	if (typeof twttr !== 'undefined' && twttr.widgets && twttr.widgets.load) {
-	  clearInterval(intervalId);
+		clearInterval(intervalId);
 	} else {
-	  censor();
+		censor();
+		// window.onload = function what(){
+		// 	document.getElementById("censored-count") = censor_count;
+		// };
 	}
 }, 1000);
