@@ -1,7 +1,7 @@
 const profanities = ['bobo', 'bwiset', 'gago', 'kupal', 'pakshet', 'pakyu', 'pucha', 
 'punyeta', 'puta', 'putangina', 'putang ina', 'tanga', 'tangina', 'tarantado', 'bobong',
-'ulol']
-let censored_count = 0;
+'ulol', 'putanginamo', 'tanginamo', 'bobobo'];
+let censoredCount = 0;
 
 async function predict(text) {
 	const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
@@ -15,8 +15,6 @@ async function predict(text) {
 	});
 
 	const data = await response.json();
-
-	console.log(data);
 	
 	if (data == "Model Dabid/test2 is currently loading"){
 		console.log("Loading....");
@@ -27,13 +25,6 @@ async function predict(text) {
 	}
 }
 
-function update_censor_count() {
-	let censor_element = document.getElementsByClassName("censored_count");
-	for (let i = 0; i < censor_element.length; i++) {
-		let element = censor_element[i];
-		element.textContent = censored_count;
-	}
-}
 
 function replace(tweet) {
 	// Get tweet contents
@@ -56,9 +47,7 @@ function replace(tweet) {
 	});
 	// Replace the main tweet content
 	tweet.innerHTML = tweet_content;
-	update_censor_count();
 }
-
 
 function censor() {
     // Get all tweets using jquery
@@ -73,9 +62,12 @@ function censor() {
 			predict(tweet_text).then((response) => {
 				console.log(response);
 				if (response == "Abusive"){
-					console.log("Censoring..." + tweet_text);
+					console.log("Censoring...", tweet_text);
 					replace(tweet); 
-					censored_count += 1;
+					censoredCount ++;
+					chrome.runtime.sendMessage({censoredCount: censoredCount}, function(response) {
+						console.log(response);
+					});	
 				}
 			});
             // Add 'censored' class to tweet element to avoid infinite prediction
@@ -84,13 +76,19 @@ function censor() {
 	});
 }
 
-
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+	if (request.censoredCount) {
+	  var myVariableValue = request.censoredCount;
+	  document.getElementById("censoredCount").textContent = myVariableValue;
+	  sendResponse("Message received by popup script.");
+	}
+});
 
 // Prediction loop (1 sec interval)
 var intervalId = setInterval(function() {
 	if (typeof twttr !== 'undefined' && twttr.widgets && twttr.widgets.load) {
 		clearInterval(intervalId);
 	} else {
-		censor();	
+		censor();
 	}
 }, 1000);
