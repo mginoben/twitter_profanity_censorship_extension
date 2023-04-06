@@ -110,4 +110,4 @@ var intervalId = setInterval(function() {
 		popupHover();
 		beginCensoring();
 	}
-}, 1000);
+}, 1000); 
