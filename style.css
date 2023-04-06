@@ -1,0 +1,23 @@
+
+.popup, .popupHover {
+  position:relative;
+  color: crimson;
+  font-weight: bold;
+}
+
+.popup div {
+  display: none;
+}
+
+.popupHover div {
+  font-weight: normal;
+  color: #174f5c;
+  background-color:gainsboro;
+  border-radius: 4px;
+  padding: 5px;
+  display: block;
+  position: fixed;
+  top:0;
+  right: 0;
+  z-index: 2147483645 !important;
+}

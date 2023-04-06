@@ -1,54 +1,3 @@
-// const profanities = ["bobo", "bwiset", "gago", "kupal", "pakshet", "pakyu", "pucha", "punyeta", "puta", "putangina", 
-// 						"tanga", "tangina", "tarantado", "ulol"];
-const profanities = {
-	"bobo": ["bobong bobo", "bobobo", "ambobo", "napakabobo", "pakabobo", "pinakabobo", "bobong"],
-	"bwiset": ["bwesit", "bweset", "buwisit", "bwesit", "buwesit", "buwiset", "nakakabwiset", "nakakabuwisit"],
-	"gago": ["gagong gago", "gaga", "gagang", "gagago", "pakagago", "napakagago", "pinakagago", "gagong"],
-	"kupal": ["kakupalan", "pinakakupal", "kukupal", "pakakupal"],
-	"pakshet": ["pakingshet"],
-	"pakyu": [],
-	"pucha": ["putsa", "puchang", "ampucha"],
-	"punyeta": ["nyeta", "punyetang", "punyemas", "ampunyeta", "napakapunyeta", "pinakapunyeta"],
-	"putangina": ["amputangina", "putanginang", "putang ina", "pukingina", "napakaputangina", "pakaputangina"],
-	"puta": ["putang", "amputa", "napakaputa", "pakaputa"],
-	"tanga": ["tangang tanga", "antanga", "tatangatanga", "pakatanga", "pinakatanga", "napakatanga", "tangang"],
-	"tangina": ["tanginang", "kinangina", "kingina", "pinakatangina"],
-	"tarantado": ["tarantadong"]
-}
-
-let censoringStatus = "paused";
-
-let censoredCount = 0;
-
-
-function getProfanityList() {
-	var allProfanities = [];
-	// Get base profanities
-	const baseProfanities = Object.keys(profanities);
-	// Loop through variations using base profanity
-	baseProfanities.forEach((baseProfanity) => {
-		allProfanities.push(baseProfanity);
-		profanities[baseProfanity].forEach((profanityVariation) => {
-			allProfanities.push(profanityVariation);
-		})
-	})
-
-	return allProfanities;
-}
-
-// Transforms profanity variations to base profanity
-function convertProfanities(text) {
-	const baseProfanities = Object.keys(profanities);
-	// Loop through variations using base profanity
-	baseProfanities.forEach((baseProfanity) => {
-		profanities[baseProfanity].forEach((profanityVariation) => {
-			var profanityPattern = new RegExp(`\\b${profanityVariation}\\b`, "gi");
-			text = text.replace(profanityPattern, baseProfanity);
-		})
-	})
-	return text;
-}
-
 async function predict(text) {
 
 	const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
@@ -56,7 +5,7 @@ async function predict(text) {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				data: [
-					convertProfanities(text),
+					text,
 				]
 		})
 	});
@@ -65,112 +14,92 @@ async function predict(text) {
 	return await data;
 }
 
+function hidePopups() {
+    var popupHovers = document.getElementsByClassName("popupHover");
+	for (var i = popupHovers.length; i--;) {
+		popupHovers[i].className = 'popup';
+	}
+};
 
-function replace(tweet) {
+function popupHover() {
+	var popupElement = document.getElementsByClassName("popup");
+	
+	for (var i = popupElement.length; i--;) {
+		(function () {
+			var t;
+			popupElement[i].onmouseover = function () {
+				hidePopups();
+				clearTimeout(t);
+				this.className = 'popupHover';
+			};
+			popupElement[i].onmouseout = function () {
+				var self = this;
+				t = setTimeout(function () {
+					self.className = 'popup';
+				}, 1000);
+			};
+		})();
+	}
+}
+
+function censor(tweet, matches) {
 	// unusual prof > known prof > predict text> Abusive?> Replace All prof
-	var hasProfanity = false;
-	var foundProfanities = [];
 	var tweetContent = tweet.innerHTML;
 	// Replace profanities in *****
-	getProfanityList().forEach((profanity) => {
+	for (let i = 0; i < matches.length; i++) {
 		// Get the exact match of profane word
-		var profaneWord = new RegExp(`\\b${profanity}\\b`, "gi");
-		// Masking for profane word
-		var mask = "";
-		for (let i = 0; i < profanity.length; i++) {
+		var matchedProfanity = new RegExp(matches[i], "gi");
+		// Censored Profanity
+		let mask = "";
+		for (let j = 0; j < matches[i].length; j++) {
 			// Add masking of * if character is not space
-			if (profanity[i] === " ") {
+			if (matches[i][j] === " ") {
 				mask += " ";
 			} else {
 				mask += "*";
 			}
 		}
-		// Replace
-		var modifiedTweetContent = tweetContent.replace(profaneWord, mask);
-		// Check if modification was done on main tweet
-		if (tweetContent !== modifiedTweetContent){
-			tweetContent = modifiedTweetContent;
-			hasProfanity = true;
-			foundProfanities.push(profanity);
-		}
-	});
-	
+		// Styled Profanity
+		mask = '<span class="popup">$&<div>Fck u David</div></span>';
+		// mask = '<span class="popup" style="color:red;">$&</span>'
+		// Generate a censored tweet
+		console.log(matchedProfanity);
+		tweetContent = tweetContent.replace(matchedProfanity, mask);
+	}
 	// Replace the main tweet content
 	tweet.innerHTML = tweetContent;
-	
-	return {
-		hasProfanity: hasProfanity,
-		foundProfanities: foundProfanities
-	};
 }
 
-function censor(censoringStatus) {
-	if (censoringStatus == "ongoing" || censoringStatus == "loading"){
-		// Send count to BG
-		if (censoredCount > 0) {
-			chrome.runtime.sendMessage({censoredCount: censoredCount});
+function beginCensoring() {
+	// Get all tweets using jquery
+	const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+	// Loop through tweets
+	for (let i = 0; i < tweets.length; i++) {
+		const textElement = tweets[i].querySelector('[data-testid="tweet"] [lang]');
+		if (textElement && !textElement.classList.contains("done")) {
+			const tweetText = textElement.textContent;
+			predict(tweetText).then((response) => {
+				var data = response['data'];
+				const label = data[0]['label'];
+				const matches = Object.keys(data[2]);
+				// Abusive Tweet
+				if (label == "Abusive") {
+					console.log("\n", tweetText);
+					console.log(data[2]);
+					// Censor
+					censor(tweets[i], matches);
+
+				}
+				else if (label == "Model Dabid/test2 is currently loading"){
+					console.log("\n Loading Model. Please Wait\n");
+				}
+			})
+			textElement.classList.add("done");
 		}
-		// Get all tweets using jquery
-		const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-		// Loop through tweets
-		tweets.forEach(tweet => {
-			const textElement = tweet.querySelector('[data-testid="tweet"] [lang]');
-			if (textElement && !textElement.classList.contains("censored")) {
-				// Get tweet text element
-				const tweetText = textElement.textContent;
-				// Apply preddictions to each tweet
-				predict(tweetText).then((response) => {
-					var result = response["data"][0]; 
-					// Loading Model
-					if (result["label"] == "Model Dabid/test2 is currently loading") {
-						chrome.runtime.sendMessage({censoringStatus: "loading"}, function(response) {
-							console.log("loading")
-						});
-					}
-					// Predicting
-					else {
-						if (result["label"] == "Abusive"){
-							console.log("\n\nCensoring...", tweetText.toLowerCase());
-							// Replace Tweet
-							const newTweet = replace(tweet);
-							if (newTweet.hasProfanity) {
-								console.log("Found profanities: " + newTweet.foundProfanities);
-								var confidence = result["confidences"][0]["confidence"] * 100;
-								console.log("Confidence: " + confidence.toFixed(2) +"%\n\n");
-								censoredCount++;
-							}
-							else{
-								console.log("No profanities found.\n\n");
-							}
-						}
-					}
-					
-					
-				})
-				// Add 'censored' class to tweet element to avoid infinite prediction
-				textElement.classList.add("censored");
-			}
-		})
 	}
-	else {
-		chrome.runtime.sendMessage({censoringStatus: "paused"}, function(response) {
-		});
-	}
-	
+	// TODO get TWEETS
 }
 
-
-// Get Count from BG
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-	if (request.censoredCount) {
-		censoredCount = request.censoredCount;
-		document.getElementById("censoredCount").textContent = censoredCount;
-	}
-	else if (request.censoringStatus) {
-		censoringStatus = request.censoringStatus;
-	  	document.getElementById("censoredCount").textContent = censoringStatus;
-	}
-});
 
 
 // Prediction loop (1 sec interval)
@@ -178,6 +107,7 @@ var intervalId = setInterval(function() {
 	if (typeof twttr !== 'undefined' && twttr.widgets && twttr.widgets.load) {
 		clearInterval(intervalId);
 	} else {
-		censor("ongoing");
+		popupHover();
+		beginCensoring();
 	}
 }, 1000);
