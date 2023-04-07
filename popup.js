@@ -14,6 +14,7 @@ async function predict(text) {
 	});
 
 	const data = await response.json();
+
 	return await data;
 }
 
@@ -45,9 +46,9 @@ function popupHover() {
 	}
 }
 
-function censor(tweet, matches) {
+function censor(tweetDiv, matches) {
 	// unusual prof > known prof > predict text> Abusive?> Replace All prof
-	var tweetContent = tweet.innerHTML;
+	var tweetContent = tweetDiv.innerHTML;
 	// Replace profanities in *****
 	for (let i = 0; i < matches.length; i++) {
 		// Get the exact match of profane word
@@ -69,45 +70,51 @@ function censor(tweet, matches) {
 		tweetContent = tweetContent.replace(matchedProfanity, mask);
 	}
 	// Replace the main tweet content
-	tweet.innerHTML = tweetContent;
+	tweetDiv.innerHTML = tweetContent;
 	counter += 1;
 }
 
 function beginCensoring() {
-	console.log("Sending Counter", counter);
-	
 	// Get all tweets using jquery
 	const tweets = document.querySelectorAll('article[data-testid="tweet"]');
 	// Loop through tweets
 	for (let i = 0; i < tweets.length; i++) {
-		const textElement = tweets[i].querySelector('[data-testid="tweet"] [lang]');
-		if (textElement && !textElement.classList.contains("done")) {
-			chrome.runtime.sendMessage({ status: 'running', counter: counter});
-			const tweetText = textElement.textContent;
-			predict(tweetText).then((response) => {
-				var data = response['data'];
+		// Get Tweet Text
+		const tweet = tweets[i].querySelector('[data-testid="tweet"] [lang]');
+		// Check if Tweet was already predicted
+		if (tweet && !tweet.classList.contains("done")) {
+			
+			const text = tweet.textContent;
+			let doneChecking = false;
+
+			// Get Tweet Preds
+			predict(text).then((response) => {
+				const data = response['data'];
 				const label = data[0]['label'];
-				const matches = Object.keys(data[2]);
-				// Abusive Tweet
-				if (label == "Abusive") {
+
+				if (label == "Model Dabid/test2 is currently loading"){ // LOADING
+					chrome.runtime.sendMessage({ status: 'loading' });
+					console.log("\n Loading Model. Please Wait\n", text);	
+					return;
+				}
+				else if (label == "No Profanity Found.") { // NO PROFANITY FOUND
+					console.log(text, "\n", label);
+				}
+				else {	// RUNNING
+					const matches = Object.keys(data[2]);
 					const confidence = data[0]['confidences'][0]['confidence'];
-					if (confidence >= 0.75) {
-						console.log("\n", tweetText);
-						console.log(data[2]);
-						console.log(confidence);
-						// Censor
+					if (label == "Abusive" && confidence >= 0.75) { // ABUSIVE TWEET
+						console.log(text, "\n", data[2], "\n", confidence);
 						censor(tweets[i], matches);
 					}
 				}
-				else if (label == "Model Dabid/test2 is currently loading"){
-					console.log("\n Loading Model. Please Wait\n");
-					chrome.runtime.sendMessage({ status: 'loading' });
-				}
-			})
-			textElement.classList.add("done");
+				chrome.runtime.sendMessage({ status: 'running' , counter: counter});
+				doneChecking = true;
+			});
+
+			tweet.classList.add("done");
 		}
 	}
-	// TODO get TWEETS
 }
 
 // Prediction loop (1 sec interval)
@@ -118,4 +125,4 @@ var intervalId = setInterval(function() {
 		popupHover();
 		beginCensoring();
 	}
-}, 1000); 
+}, 300); 
