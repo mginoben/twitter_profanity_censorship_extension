@@ -1,3 +1,6 @@
+let counter = 0;
+
+
 async function predict(text) {
 
 	const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
@@ -63,20 +66,23 @@ function censor(tweet, matches) {
 		mask = '<span class="popup">$&<div>Fck u David</div></span>';
 		// mask = '<span class="popup" style="color:red;">$&</span>'
 		// Generate a censored tweet
-		console.log(matchedProfanity);
 		tweetContent = tweetContent.replace(matchedProfanity, mask);
 	}
 	// Replace the main tweet content
 	tweet.innerHTML = tweetContent;
+	counter += 1;
 }
 
 function beginCensoring() {
+	console.log("Sending Counter", counter);
+	
 	// Get all tweets using jquery
 	const tweets = document.querySelectorAll('article[data-testid="tweet"]');
 	// Loop through tweets
 	for (let i = 0; i < tweets.length; i++) {
 		const textElement = tweets[i].querySelector('[data-testid="tweet"] [lang]');
 		if (textElement && !textElement.classList.contains("done")) {
+			chrome.runtime.sendMessage({ status: 'running', counter: counter});
 			const tweetText = textElement.textContent;
 			predict(tweetText).then((response) => {
 				var data = response['data'];
@@ -84,14 +90,18 @@ function beginCensoring() {
 				const matches = Object.keys(data[2]);
 				// Abusive Tweet
 				if (label == "Abusive") {
-					console.log("\n", tweetText);
-					console.log(data[2]);
-					// Censor
-					censor(tweets[i], matches);
-
+					const confidence = data[0]['confidences'][0]['confidence'];
+					if (confidence >= 0.75) {
+						console.log("\n", tweetText);
+						console.log(data[2]);
+						console.log(confidence);
+						// Censor
+						censor(tweets[i], matches);
+					}
 				}
 				else if (label == "Model Dabid/test2 is currently loading"){
 					console.log("\n Loading Model. Please Wait\n");
+					chrome.runtime.sendMessage({ status: 'loading' });
 				}
 			})
 			textElement.classList.add("done");
@@ -99,8 +109,6 @@ function beginCensoring() {
 	}
 	// TODO get TWEETS
 }
-
-
 
 // Prediction loop (1 sec interval)
 var intervalId = setInterval(function() {
