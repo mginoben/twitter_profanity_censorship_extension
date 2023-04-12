@@ -1,128 +1,247 @@
-let counter = 0;
-
-
 async function predict(text) {
 
-	const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
+    try {
+        const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				data: [
 					text,
 				]
-		})
-	});
+            })
+        });
 
-	const data = await response.json();
+        const data = await response.json();
 
-	return await data;
+        return await data;
+    } catch (error) {
+        console.log("Can't reach model.");
+    }
+	
 }
 
 function hidePopups() {
-    var popupHovers = document.getElementsByClassName("popupHover");
-	for (var i = popupHovers.length; i--;) {
-		popupHovers[i].className = 'popup';
+    var popups = document.getElementsByClassName("popup");
+	for (var i = popups.length; i--;) {
+		if (!popups[i].classList.contains("popup-hidden")) {
+			popups[i].classList.add("popup-hidden");
+		}
 	}
 };
 
-function popupHover() {
-	var popupElement = document.getElementsByClassName("popup");
+
+function popup(tweet, checkState) {
+
+    if (tweet.classList.contains("hasPopup")) {
+        return;
+    }
+
+    const content = tweet.querySelector('[data-testid="tweet"] [lang]').textContent;
+    const author = tweet.querySelector('[data-testid="User-Name"]').innerText.split(/\r?\n/)[1];
+    const unCensoredTweet = { content, author };
+    
+	const popup = document.createElement('div');
+	popup.classList.add("popup", "popup-hidden");
+
+    var checkbox = document.createElement('input');   
+    checkbox.type = 'checkbox';
+    checkbox.classList.add("censorToggle");
+
+	popup.appendChild(checkbox);
+    tweetParent = tweet.querySelector('[data-testid="tweet"] [lang]').parentNode;
+    tweetParent.appendChild(popup)
+
+    var checkbox = tweet.querySelector(".censorToggle");
+    checkbox.checked = checkState;
+    checkbox.addEventListener('change', function() {
+        if (this.checked) {
+            chrome.runtime.sendMessage({ 
+                uncensor: "append",
+                data: unCensoredTweet
+            });
+        } else {
+            chrome.runtime.sendMessage({ 
+                uncensor: "remove",
+                data: unCensoredTweet
+            });
+        }
+    });
+
+    tweet.onmouseover = function () {
+        var popup = this.parentNode.querySelector(".popup");
+        hidePopups();
+        popup.classList.remove("popup-hidden");
+        
+    };
+    tweet.onmouseout = function () {
+        var popup = this.parentNode.querySelector(".popup");
+        popup.classList.add("popup-hidden");
+
+    };
+
+    tweet.classList.add("hasPopup");
+}
+
+
+function uncensor(tweet) {
+    var censoredTweets = tweet.querySelectorAll(".censored");
+    for (let i = 0; i < censoredTweets.length; i++) {
+        if (censoredTweets[i].classList.contains("censored")) {
+            censoredTweets[i].classList.remove("censored");
+        }  
+    }
+}
+
+
+function censor(tweet, matches) {
+    var tweetHTML = tweet.innerHTML;
 	
-	for (var i = popupElement.length; i--;) {
-		(function () {
-			var t;
-			popupElement[i].onmouseover = function () {
-				hidePopups();
-				clearTimeout(t);
-				this.className = 'popupHover';
-			};
-			popupElement[i].onmouseout = function () {
-				var self = this;
-				t = setTimeout(function () {
-					self.className = 'popup';
-				}, 1000);
-			};
-		})();
-	}
-}
-
-function censor(tweetDiv, matches) {
-	// unusual prof > known prof > predict text> Abusive?> Replace All prof
-	var tweetContent = tweetDiv.innerHTML;
-	// Replace profanities in *****
 	for (let i = 0; i < matches.length; i++) {
-		// Get the exact match of profane word
 		var matchedProfanity = new RegExp(matches[i], "gi");
-		// Censored Profanity
-		let mask = "";
-		for (let j = 0; j < matches[i].length; j++) {
-			// Add masking of * if character is not space
-			if (matches[i][j] === " ") {
-				mask += " ";
-			} else {
-				mask += "*";
-			}
-		}
-		// Styled Profanity
-		mask = '<span class="popup">$&<div>Fck u David</div></span>';
-		// mask = '<span class="popup" style="color:red;">$&</span>'
-		// Generate a censored tweet
-		tweetContent = tweetContent.replace(matchedProfanity, mask);
+		mask = '<span class="censored">$&</span>';
+		tweetHTML = tweetHTML.replace(matchedProfanity, mask);
 	}
-	// Replace the main tweet content
-	tweetDiv.innerHTML = tweetContent;
-	counter += 1;
+
+	tweet.innerHTML = tweetHTML;
 }
 
-function beginCensoring() {
-	// Get all tweets using jquery
-	const tweets = document.querySelectorAll('article[data-testid="tweet"]');
-	// Loop through tweets
-	for (let i = 0; i < tweets.length; i++) {
-		// Get Tweet Text
-		const tweet = tweets[i].querySelector('[data-testid="tweet"] [lang]');
-		// Check if Tweet was already predicted
-		if (tweet && !tweet.classList.contains("done")) {
-			
-			const text = tweet.textContent;
-			let doneChecking = false;
 
-			// Get Tweet Preds
-			predict(text).then((response) => {
-				const data = response['data'];
-				const label = data[0]['label'];
+function toggleButton() {
+    chrome.runtime.sendMessage({toggle: "get"}, function(response) {
+        let currentStatus = response.toggleStatus;
+        let toggleButton = document.querySelector("#toggleButton");
+        let currentStatusText = document.querySelector("#currentStatus");
 
-				if (label == "Model Dabid/test2 is currently loading"){ // LOADING
-					chrome.runtime.sendMessage({ status: 'loading' });
-					console.log("\n Loading Model. Please Wait\n", text);	
-					return;
-				}
-				else if (label == "No Profanity Found.") { // NO PROFANITY FOUND
-					console.log(text, "\n", label);
-				}
-				else {	// RUNNING
-					const matches = Object.keys(data[2]);
-					const confidence = data[0]['confidences'][0]['confidence'];
-					if (label == "Abusive" && confidence >= 0.75) { // ABUSIVE TWEET
-						console.log(text, "\n", data[2], "\n", confidence);
-						censor(tweets[i], matches);
-					}
-				}
-				chrome.runtime.sendMessage({ status: 'running' , counter: counter});
-				doneChecking = true;
-			});
+        if (currentStatus == "on") {
+            toggleButton.textContent = "Off";
+            currentStatusText.textContent = "Currently Censoring";
+            toggleButton.style.backgroundColor = "#c75b52";
+        } else {
+            currentStatusText.textContent = "Not Censoring";
+            toggleButton.textContent = "On";
+            toggleButton.style.backgroundColor = "#72dba0";
+        }
 
-			tweet.classList.add("done");
-		}
-	}
+        // Add an event listener to the toggle button
+        toggleButton.addEventListener("click", function() {
+            // Toggle the button text and background color
+            if (toggleButton.textContent === "Off") {
+                chrome.runtime.sendMessage({ toggle: "off" });
+                currentStatusText.textContent = "Not Censoring";
+                toggleButton.textContent = "On";
+                toggleButton.style.backgroundColor = "#72dba0";
+            } else {
+                chrome.runtime.sendMessage({ toggle: "on" });
+                toggleButton.textContent = "Off";
+                currentStatusText.textContent = "Currently Censoring";
+                toggleButton.style.backgroundColor = "#c75b52";
+            }
+        });
+    });
+    // Get a reference to the toggle button element
+    
+
+    
 }
 
-// Prediction loop (1 sec interval)
+
+function monitor() {
+       
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+    
+    chrome.runtime.sendMessage({action: "getTweets"}, function(response) {  
+        var abusiveTweets = response.abusiveContents;
+        var uncensoredTweets = response.uncensoredContents;
+
+        for (let i = 0; i < tweets.length; i++) {
+
+            var tweet = tweets[i].querySelector('[data-testid="tweet"] [lang]');
+
+            if (!tweet) {
+                continue;
+            }
+
+            const content = tweet.textContent;
+            const author = tweets[i].querySelector('[data-testid="User-Name"]').innerText.split(/\r?\n/)[1];
+            let foundAbusiveTweet = false;  
+            let foundUncensoredTweet = false;
+            let uncensoredTweetProfanities;
+
+            for(var j = 0; j < uncensoredTweets.length; j++) {
+                if (uncensoredTweets[j].content == content && uncensoredTweets[j].author == author) { // CHECK U-LIST
+                    foundUncensoredTweet = true;
+                    break;
+                }
+            }
+
+            for(var k = 0; k < abusiveTweets.length; k++) {
+                if (abusiveTweets[k].content == content && abusiveTweets[k].author == author) { // CHECK A-LIST
+                    foundAbusiveTweet = true;
+                    uncensoredTweetProfanities = abusiveTweets[k].matches;
+                    break;
+                }
+            }
+
+            if (foundUncensoredTweet) { // IN U-LIST
+                uncensor(tweet);
+                popup(tweets[i], true);
+                continue;
+            }
+            else if (foundAbusiveTweet) { // IN A-LIST
+                censor(tweet, uncensoredTweetProfanities);
+                popup(tweets[i], false);
+                continue;
+            }
+
+            if (!tweet.classList.contains("done")) {
+  
+                // console.log("ABUSIVE TWEETS:", foundAbusiveTweet);
+                // console.log("UNCENSORED TWEETS:", foundUncensoredTweet);
+             
+                predict(content).then((response) => { // NOT IN A-LIST
+
+                    const data = response['data'];
+                    const label = data[0]['label'];
+                    // console.log(data);
+
+                    if (label == "Model Dabid/test2 is currently loading"){ // LOADING
+                        chrome.runtime.sendMessage({ status: 'loading' });	
+                        return;
+                    }
+                    else if (label == "Abusive") { // ABUSIVE TWEET
+                        const matches = Object.keys(data[2]);
+                        const extractedTweet = { content, matches, author };
+                    
+                        chrome.runtime.sendMessage({ // APPEND TO A-LIST
+                            action: "append",
+                            data: extractedTweet
+                        });
+                    }
+                    
+                    chrome.runtime.sendMessage({ status: 'running' });
+                    
+                }); 
+
+                tweet.classList.add("done");
+          
+            }
+        }
+    });
+    
+}
+
+toggleButton();
+
+
 var intervalId = setInterval(function() {
-	if (typeof twttr !== 'undefined' && twttr.widgets && twttr.widgets.load) {
-		clearInterval(intervalId);
-	} else {
-		popupHover();
-		beginCensoring();
-	}
-}, 300); 
+    chrome.runtime.sendMessage({toggle: "get"}, function(response) {
+        let currentStatus = response.toggleStatus;
+        if (currentStatus == "on") {
+            monitor();
+        }
+    });
+}, 100);
+    
+
+    
+

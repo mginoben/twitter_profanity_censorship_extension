@@ -1,15 +1,19 @@
 
-.popup, .popupHover {
-  position:relative;
-  color: crimson;
-  font-weight: bold;
-}
-
-.popup div {
+body.loading {
   display: none;
 }
 
-.popupHover div {
+.censored {
+  color: #d3d3d3;
+  background-color: #d3d3d3;
+  user-select: none; /* Standard syntax */
+}
+
+.popup-hidden {
+  display: none !important; 
+}
+
+.popup {
   font-weight: normal;
   color: #174f5c;
   background-color:gainsboro;
@@ -18,6 +22,6 @@
   display: block;
   position: fixed;
   top:0;
-  right: 0;
-  z-index: 2147483645 !important;
+  right: 50px;
 } 
+
