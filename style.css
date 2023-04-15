@@ -3,17 +3,55 @@ body.loading {
   display: none;
 }
 
+.hide {
+  content-visibility: hidden;
+}
+
 .censored span {
   color: #8b8b8b !important;
   background-color: #8b8b8b;
   user-select: none; /* Standard syntax */
 }
 
+.censored a {
+  text-decoration: none;
+  color: #8b8b8b !important;
+  background-color: #8b8b8b;
+  user-select: none;
+  pointer-events: none;
+  cursor: default;
+}
+
 .censored img {
   /* visibility: hidden; */
-  background-color: #8b8b8b;
+  /* opacity: 0; */
+  background-color: #8b8b8b; 
+  margin: 0;
+  height: 20px;
   user-select: none; /* Standard syntax */
+  z-index: -1;
 }
+
+.show span {
+  user-select: auto;
+  pointer-events: auto;
+  cursor:pointer;
+  color: #cc5b5b !important;
+  background-color: transparent !important;
+}
+
+.show a {
+  pointer-events: auto;
+  cursor:pointer;
+  color: #cc5b5b !important;
+  background-color: transparent !important;
+}
+
+.show img {
+  background-color: transparent !important;
+  opacity: 1;
+}
+
 .popup-hidden {
   display: none !important; 
 }
