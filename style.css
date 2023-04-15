@@ -3,12 +3,17 @@ body.loading {
   display: none;
 }
 
-.censored {
-  color: #d3d3d3;
-  background-color: #d3d3d3;
+.censored span {
+  color: #8b8b8b !important;
+  background-color: #8b8b8b;
   user-select: none; /* Standard syntax */
 }
 
+.censored img {
+  /* visibility: hidden; */
+  background-color: #8b8b8b;
+  user-select: none; /* Standard syntax */
+}
 .popup-hidden {
   display: none !important; 
 }

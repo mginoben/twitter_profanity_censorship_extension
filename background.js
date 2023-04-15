@@ -1,6 +1,4 @@
-var abusiveTweets = [];
-var uncensoredTweets = [];
-var toggle = "on";
+let tweetPredictions = [];
 
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
@@ -10,64 +8,49 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     chrome.action.setBadgeText({ text: '...', tabId: sender.tab.id });
     chrome.action.setBadgeBackgroundColor({ color: "#8b0000", tabId: sender.tab.id });
   }
+
   else if (response.status == 'running') { // SEND COUNTER
     if (abusiveTweets.length > 0) {
-      chrome.action.setBadgeText({text: abusiveTweets.length.toString(), tabId: sender.tab.id });
+      chrome.action.setBadgeText({text: tweetPredictions.length.toString(), tabId: sender.tab.id });
     } else {
       chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
     }
     chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
     chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
   }
-  else if (response.action == "append") { // ADD ABUSIVE TWEET
-    const data = response.data;
   
-    abusiveTweets.push(data);
-    console.log("CENSORED:", abusiveTweets);
-    
-  }
-  else if (response.action == "getTweets") { // GET ALL TWEETS (ABUSIVE/UNCENSORED)
-    sendResponse({abusiveContents: abusiveTweets, uncensoredContents: uncensoredTweets});
-  }
-  else if (response.uncensor == "append") { // ADD UNCENSORED TWEET
-
+  else if (response.action == "push") { // ADD ABUSIVE TWEET
     const data = response.data;
-    let inArray = false;
+    tweetPredictions.push(data);
+    console.log(data);  
+  }
 
-    for(var i = 0; i < uncensoredTweets.length; i++) {
-      if (uncensoredTweets[i].content == data.content && uncensoredTweets[i].author == data.author) { 
-        inArray = true;
-        break;
+  else if (response.action == "get") { // GET ALL TWEETS (ABUSIVE/UNCENSORED)
+    const tweets = tweetPredictions.map(obj => obj.tweet);
+    sendResponse({ tweets: tweets });
+  }
+
+  else if (response.action == "compare") { // COMPARE CURRENT TWEET TO LIST
+    const result = tweetPredictions.find(obj => obj.tweet === response.tweet);
+    sendResponse({ prediction: result.prediction});
+  }
+
+  else if (response.action == "toggle") { // COMPARE CURRENT TWEET TO LIST
+    for (let i = 0; i < tweetPredictions.length; i++) {
+      console.log("wewe");
+      if (tweetPredictions[i].tweet == response.tweet) {
+
+        if (tweetPredictions[i].toggle) {
+          tweetPredictions[i]["toggle"] = false;
+        } else {
+          tweetPredictions[i]["toggle"] = true;
+        }
       }
-    }
-    
-    if (!inArray) {
-      uncensoredTweets.push(data);
-      console.log("UNCENSORED:", data.content);
+
     }
 
   }
-  else if (response.uncensor == "remove") { // REMOVE UNCENSORED TWEET
-    const data = response.data;
-    for(var i = 0; i < uncensoredTweets.length; i++) {
-      if (uncensoredTweets[i].content == data.content && uncensoredTweets[i].author == data.author) { 
-          console.log("RECENSORED:", data.content);
-          uncensoredTweets.splice(i, 1);
-          break;
-      }
-    }
-  }
-  else if (response.toggle) { // TOGGLE
-    if (response.toggle == "get") { 
-      sendResponse({toggleStatus: toggle});
-    }
-    else {
-      toggle = response.toggle;
-      console.log("IM", toggle);
-      // Reload the current tab
-      chrome.tabs.reload();
-    }
-  }
+  
 });
 
 
