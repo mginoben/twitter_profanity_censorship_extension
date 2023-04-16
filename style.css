@@ -23,13 +23,13 @@ body.loading {
 }
 
 .censored img {
+  content-visibility: hidden;
   /* visibility: hidden; */
   /* opacity: 0; */
   background-color: #8b8b8b; 
   margin: 0;
   height: 20px;
   user-select: none; /* Standard syntax */
-  z-index: -1;
 }
 
 .show span {
@@ -48,6 +48,7 @@ body.loading {
 }
 
 .show img {
+  content-visibility: auto;
   background-color: transparent !important;
   opacity: 1;
 }

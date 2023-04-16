@@ -75,97 +75,93 @@ function getUsername(tweet) {
 
 function getTweets() {
 
-            let newTweetFound = false;
-            const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+    let newTweetFound = false;
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
 
-            for (let i = 0; i < tweets.length; i++) { 
+    for (let i = 0; i < tweets.length; i++) { 
 
-                chrome.runtime.sendMessage({action: "get"}, function(response) {
+        chrome.runtime.sendMessage({action: "get"}, function(response) {
 
-                    var tweetDiv = tweets[i].querySelector('[data-testid="tweet"] [lang]');
-                    var usernameDiv = tweets[i].querySelector('[data-testid="User-Name"]');
-                    const language = tweetDiv.getAttribute("lang");
-                    const savedTweets = response.tweets;
-                    const tweet = tweetDiv.innerText;
-                    const username = getUsername(usernameDiv.innerText);
+            var tweetDiv = tweets[i].querySelector('[data-testid="tweet"] [lang]');
+            var usernameDiv = tweets[i].querySelector('[data-testid="User-Name"]');
+            const language = tweetDiv.getAttribute("lang");
+            const savedTweets = response.tweets;
+            const tweet = tweetDiv.innerText;
+            const username = getUsername(usernameDiv.innerText);
 
-                    if (language != "tl") {
-                        // console.log("Not Tagalog", tweet);
-                        return;
-                    }
-
-                    if (!savedTweets.includes(tweet)) {
-
-                        newTweetFound = true;
-            
-                        query(tweet).then(result => {
-                            
-                            if (result == "error") { // ERROR
-                                console.log("Error");
-                                return; 
-                            } 
-            
-                            const prediction = result["data"][0]["label"];
-            
-                            if (prediction == "Model is loading. Try again.") { // LOADING
-                                console.log("Model Loading");
-                                chrome.runtime.sendMessage({ 
-                                    status: "loading"
-                                });
-                                return; 
-                            }
-                
-                            // GOOD
-                            const data = { tweet, username, prediction };
-                                
-                            chrome.runtime.sendMessage({ 
-                                action: "push",
-                                data: data
-                            });
-
-                            if (prediction == "Abusive") {
-                                censor(tweetDiv);                
-                            }
-
-                            // console.log(tweetDiv.getAttribute("lang"));
-                            
-                                                
-                        }); 
-                        
-                    }
-                    else {
-                        chrome.runtime.sendMessage({ action: "compare", tweet: tweet }, function(response) {
-
-                            if (response.result.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
-                                console.log("Still here but abusive");
-                                censor(tweetDiv);
-                            }
-
-                        });
-                    }
-
-
-                    chrome.runtime.sendMessage({ 
-                        status: "running"
-                    });
-                });
-
-                // if (newTweetFound) {
-                //     break;
-                // }
-
+            if (language != "tl") {
+                // console.log("Not Tagalog", tweet);
+                return;
             }
 
-            return newTweetFound;
+            if (!savedTweets.includes(tweet)) {
+
+                newTweetFound = true;
+    
+                query(tweet).then(result => {
+                    
+                    if (result == "error") { // ERROR
+                        console.log("Error");
+                        return; 
+                    } 
+    
+                    const prediction = result["data"][0]["label"];
+    
+                    if (prediction == "Model is loading. Try again.") { // LOADING
+                        console.log("Model Loading");
+                        chrome.runtime.sendMessage({ 
+                            status: "loading",
+                        });
+                        return; 
+                    }
+        
+                    // GOOD
+                    const data = { tweet, username, prediction };
+                        
+                    chrome.runtime.sendMessage({ 
+                        action: "push",
+                        data: data
+                    });
+
+                    if (prediction == "Abusive") {
+                        censor(tweetDiv);                
+                    }
+
+                    // console.log(tweetDiv.getAttribute("lang"));
+                    
+                                        
+                }); 
+                
+            }
+            else {
+                chrome.runtime.sendMessage({ action: "compare", tweet: tweet }, function(response) {
+
+                    if (response.result.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
+                        censor(tweetDiv);
+                    }
+
+                });
+            }
+
+
+            chrome.runtime.sendMessage({ 
+                status: "running"
+            });
+        });
+
+        // if (newTweetFound) {
+        //     break;
+        // }
+
+    }
+
+    return newTweetFound;
 
 }
 
 function checkTweets() {
     
 }
-
-
-
 
 
 window.onload = function() {

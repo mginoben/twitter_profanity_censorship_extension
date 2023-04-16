@@ -1,5 +1,7 @@
 let tweetPredictions = [];
 
+
+
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
 
@@ -8,27 +10,33 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     chrome.action.setBadgeBackgroundColor({ color: "#8b0000", tabId: sender.tab.id });
 
     let frames = ["-", "\\", "|", "/"];
-    let currentFrame = 0;
-    let intervalId = setInterval(() => {
-      chrome.browserAction.setBadgeText({text: frames[currentFrame], tabId: sender.tab.id });
-      currentFrame = (currentFrame + 1) % frames.length;
-    }, 1000);
+
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      chrome.browserAction.setBadgeText({text: frame, tabId: sender.tab.id });
+    }
+
   }
 
   else if (response.status == 'running') { // SEND COUNTER
-    chrome.action.setBadgeText({text: tweetPredictions.length.toString(), tabId: sender.tab.id });
-    chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
-    chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
-  }
-  
-  else if (response.action == "push") { // ADD ABUSIVE TWEET
 
-    if (tweetPredictions.length > 0) {
-      chrome.action.setBadgeText({text: tweetPredictions.length.toString(), tabId: sender.tab.id });
+    let abusiveCount = 0;
+
+    for (let i = 0; i < tweetPredictions.length; i++) {
+      if (tweetPredictions[i]["prediction"] === "Abusive") {
+        abusiveCount++;
+      }
+    }
+
+    if (abusiveCount > 0) {
+      chrome.action.setBadgeText({text: abusiveCount.toString(), tabId: sender.tab.id });
       chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
       chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
     }
 
+  }
+  
+  else if (response.action == "push") { // ADD ABUSIVE TWEET
     const data = response.data;
     tweetPredictions.push(data);
     console.log(data);  
@@ -42,26 +50,6 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
   else if (response.action == "compare") { // COMPARE CURRENT TWEET TO LIST
     const result = tweetPredictions.find(obj => obj.tweet === response.tweet);
     sendResponse({ result: result});
-  }
-
-  else if (response.action == "toggle") { // COMPARE CURRENT TWEET TO LIST
-    for (let i = 0; i < tweetPredictions.length; i++) {
-      
-      if (tweetPredictions[i].tweet == response.tweet) {
-        console.log(tweetPredictions[i].tweet, response.tweet);
-
-        if (tweetPredictions[i].toggle) {
-          tweetPredictions[i].toggle = false;
-          break;
-        } else {
-          tweetPredictions[i].toggle = true;
-          break;
-        }
-        
-      }
-
-    }
-
   }
   
 });
