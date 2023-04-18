@@ -28,7 +28,6 @@ body.loading {
   /* opacity: 0; */
   background-color: #8b8b8b; 
   margin: 0;
-  height: 20px;
   user-select: none; /* Standard syntax */
 }
 
