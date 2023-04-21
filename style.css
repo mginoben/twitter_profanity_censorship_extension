@@ -52,19 +52,44 @@ body.loading {
   opacity: 1;
 }
 
-.popup-hidden {
+.overlay-hidden {
   display: none !important; 
 }
 
-.popup {
+.overlay {
   font-weight: normal;
   color: #174f5c;
   background-color:gainsboro;
   border-radius: 4px;
   padding: 5px;
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   position: fixed;
   top:0;
-  right: 50px;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation: fadeInOut 3s ease-in-out forwards;
 } 
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.95;
+    display: none;
+  }
+}
+
+.overlay img {
+  height: 200px;
+  display: block;
+}
+
 
