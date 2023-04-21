@@ -1,20 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Document</title>
-    <script src="popup.js"></script>
-</head>
-<body>
+<html>
+  <head>
+    <title>My Extension</title>
+  </head>
+  <body>
+ 
+    <div>
+      <span id="censoredCountTitle">Censored tweets since visiting</span>
 
-    <span>Hellow Worlds</span>
-    <div class="censoredCount">
-        <p id="censoredCount"></p>
+      <div>
+        <p>
+
+          <span id="censoredCount">0</span> 
+          (<span id="censoredRatio">0</span>%)
+
+        </p>
+      </div>
+
     </div>
 
-    
-</body> 
+    <script src="popup.js"></script>
+  </body>
 </html>

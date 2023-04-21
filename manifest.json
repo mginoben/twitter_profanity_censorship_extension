@@ -15,19 +15,14 @@
   ],
   "permissions": ["storage", "tabs", "scripting", "webNavigation", "activeTab"],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "persisent": true
   },
   "content_scripts": [
     {
       "css": [ "style.css" ],
-      "matches": ["https://twitter.com/*"],
-      "js": ["popup.js"]
-    }
-  ],
-  "web_accessible_resources": [
-    {
-        "resources": ["sand-clock.png"],
-        "matches": ["https://twitter.com/*"]
+      "matches": ["*://twitter.com/*"],
+      "js": ["content.js"]
     }
   ],
   "icons": {

@@ -76,14 +76,13 @@ body.loading {
 
 @keyframes fadeInOut {
   0% {
-    opacity: 0.9;
-  }
-  50% {
     opacity: 1;
+  }
+  20% {
+    opacity: 0.98;
   }
   100% {
     opacity: 0.95;
-    display: none;
   }
 }
 
