@@ -5,6 +5,11 @@ let modelStatus = "running";
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
 
+  if (response.censoredCount) {
+    console.log(response.censoredCount, "From Popup MOFO"); // "Hello from the popup script!"
+    sendResponse("Message received by background script.");
+  }
+
   if (response.status) {
 
     if (response.status === "loading") {
@@ -37,7 +42,7 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
   else if (response.action) {
 
     if (response.action === "push") {
-
+      
       const data = response.data;
       let foundTweet = false;
   
@@ -51,6 +56,7 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
       if (!foundTweet) {
         tweetPredictions.push(data);
         console.log(data);  
+        document.getElementById('censoredCount').textContent = "AS";
       }
 
     }
@@ -78,14 +84,15 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
 });
 
 
-// Listen for tab updates
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Only send message when the tab has finished loading
-  if (changeInfo.status === 'complete') {
-    // Send message to the content script
-    chrome.tabs.sendMessage(tabId, { message: 'TabUpdated' }, response => {
-      console.log(response);
-    });
-  }
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
+
+    if (changeInfo.title) {
+      // Send a message to the content script
+      chrome.tabs.sendMessage(tabId, { message: "TabUpdated" }, function(response) {
+        console.log(response);
+      });
+    }
+  
 });
+
 
