@@ -92,7 +92,7 @@ function getTweets() {
 
     chrome.runtime.sendMessage({ popup: "update"});
 
-    query("check model").then(result => {
+    query("test").then(result => {
 
         if (result == "error" || result == "loading") { 
             console.log(result);
@@ -150,7 +150,7 @@ function getTweets() {
                         
                         chrome.runtime.sendMessage({ 
                             action: "push",
-                            data: data
+                            tweet: data
                         });
 
                     }); 

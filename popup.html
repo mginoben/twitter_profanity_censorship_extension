@@ -2,21 +2,36 @@
 <html>
   <head>
     <title>My Extension</title>
+    <link rel="stylesheet" href="style.css">
   </head>
   <body>
- 
-    <div>
-      <span id="censoredCountTitle">Censored tweets since visiting</span>
-
+    <div class="popupContainer">
       <div>
-        <p>
-
-          <span id="censoredCount">0</span> 
-          (<span id="censoredRatio">0</span>%)
-
-        </p>
+        <span id="popupTitle">Censored tweets since visit</span>
+  
+        <div>
+          <p>
+  
+            <span id="censoredCount">0</span> 
+            (<span id="censoredRatio">0</span>%)
+  
+          </p>
+        </div>
+  
       </div>
-
+      <div>
+        <span id="popupTitle">Censored tweets on this feed</span>
+  
+        <div>
+          <p>
+  
+            <span id="feedCensoredCount">0</span> 
+            (<span id="feedCensoredRatio">0</span>%)
+  
+          </p>
+        </div>
+  
+      </div>
     </div>
 
     <script src="popup.js"></script>

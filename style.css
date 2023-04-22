@@ -91,4 +91,7 @@ body.loading {
   display: block;
 }
 
+.popupContainer {
+  width: 100px;
+}
 

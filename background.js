@@ -1,14 +1,24 @@
 let tweetPredictions = [];
-let modelStatus = "running";
 let abusiveCount = 0;
 let totalCount = 0;
+
+let feedTweetPredictions = [];
+let feedTotalCount = 0;
+let feedAbusiveCount = 0;
 
 let censoredCount;
 let censoredRatio;
 
-function computeCensoredRatio() {
+function computeCensoredRatio(listOfTweet) {
+  let abusiveCount = 0;
+  
+  listOfTweet.forEach(tweet => {
+    if (tweet.prediction === "Abusive") {
+      abusiveCount++;
+    }
+  });
 
-  const ratio = (abusiveCount / totalCount) * 100;
+  const ratio = (abusiveCount / listOfTweet.length) * 100;
 
   if (isNaN(Math.round(ratio))) {
     return 0;
@@ -17,10 +27,32 @@ function computeCensoredRatio() {
   return Math.round(ratio);
 }
 
+function findTweet(listOfTweet, newTweet) {
+  return listOfTweet.some(obj => obj.tweet === newTweet.tweet && obj.username === newTweet.username);
+}
+
+function countAbusive(listOfTweet) {
+  let count =0;
+  
+  listOfTweet.forEach(tweet => {
+    if (tweet.prediction === "Abusive") {
+      count ++;
+    }
+  });
+
+  return count;
+}
+
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
+
   if (response.popup === "update") {
-    sendResponse({ abusiveCount: abusiveCount, abusiveRatio: computeCensoredRatio()});
+    sendResponse({ 
+      censoredCount: countAbusive(tweetPredictions), 
+      censoredRatio: computeCensoredRatio(tweetPredictions),
+      feedCensoredCount: countAbusive(feedTweetPredictions),
+      feedCensoredRatio: computeCensoredRatio(feedTweetPredictions)
+    });
   }
 
   if (response.status === "loading") {
@@ -29,7 +61,8 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     chrome.action.setBadgeTextColor({ color: 'white', tabId: sender.tab.id  });
     chrome.action.setBadgeBackgroundColor({ color: "#8b0000", tabId: sender.tab.id });
   }
-  else if (response.status === "running") {
+
+  if (response.status === "running") {
 
     modelStatus = "running";
 
@@ -41,28 +74,13 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     }
     
   }
-  else if (response.status === "get") {
-    sendResponse({ status: modelStatus });
-  }
   
   if (response.action === "push") {
     
-    const data = response.data;
-    let foundTweet = false;
+    const tweet = response.tweet;
 
-    for (let i = 0; i < tweetPredictions.length; i++) {
-      if (tweetPredictions[i]["tweet"] === data.tweet) {
-        foundTweet = true;
-        break;
-      }
-    }
-
-    if (!foundTweet) {
-      if (data.prediction == "Abusive") {
-        abusiveCount++;
-      }
-      tweetPredictions.push(data);
-      totalCount++;
+    if (!findTweet(tweetPredictions, tweet)) {
+      tweetPredictions.push(tweet);
     }
 
   }
@@ -75,9 +93,14 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
   else if (response.action === "compare") {
 
     for (let i = 0; i < tweetPredictions.length; i++) {
+      const tweet = tweetPredictions[i];
+      if (tweet.tweet === response.tweet && tweet.username === response.username) {
+        sendResponse({ result: tweet});
 
-      if (tweetPredictions[i].tweet === response.tweet && tweetPredictions[i].username === response.username) {
-        sendResponse({ result: tweetPredictions[i]});
+        if (!findTweet(feedTweetPredictions, tweet)) {
+          feedTweetPredictions.push(tweet);
+        }
+
         break;
       }
 
@@ -85,7 +108,6 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
 
   }
 
-  
 });
 
 
@@ -93,7 +115,7 @@ chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   console.log(changeInfo.title, changeInfo.status);
  
     if (changeInfo.title == "Twitter") {
-      
+      feedTweetPredictions.length = 0;
       // Send a message to the content script
       chrome.tabs.sendMessage(tabId, { tabUpdated: true }, function(response) {
         console.log(response);
