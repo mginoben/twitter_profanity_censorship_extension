@@ -1,0 +1,30 @@
+@font-face {
+    font-family: simplysans;
+    src: url(fonts/simplysans.ttf);
+}
+
+@font-face {
+    font-family: alte;
+    src: url(fonts/alte.ttf);
+}
+
+body {
+    color: white;
+    background-color:#1f1f1f;
+}
+
+
+.container {
+    width: 100px;
+    padding: 10px;
+}
+
+.container div {
+    font-size: 15px;
+    font-family: alte;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}

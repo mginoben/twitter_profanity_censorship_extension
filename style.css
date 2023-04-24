@@ -7,6 +7,10 @@ body.loading {
   content-visibility: hidden;
 }
 
+.censored {
+  padding-right: 30px !important;
+}
+
 .censored span {
   color: #8b8b8b !important;
   background-color: #8b8b8b;
@@ -93,5 +97,13 @@ body.loading {
 
 .popupContainer {
   width: 100px;
+}
+
+.report-img {
+  display: none;
+  width: 25px;
+  align-self: flex-end;
+  position: absolute;
+  z-index: 1;
 }
 

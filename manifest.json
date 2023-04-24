@@ -25,6 +25,12 @@
       "js": ["content.js"]
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "images/report.png"],
+      "matches": [ "*://twitter.com/*" ]
+    }
+  ],
   "icons": {
       "16": "icon16.png",
       "48": "icon48.png",

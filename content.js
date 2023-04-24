@@ -1,9 +1,9 @@
 
 async function query(tweet) {
 
-    let response;
     try {
-        response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
+
+        const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -12,31 +12,27 @@ async function query(tweet) {
                 ]
             })
         });
+
+        if (response.ok) {
+            let intervalID;
+            const expectedResults = ["Abusive", "Non-Abusive", "No Profanity"];
+            const result = await response.json();
+            const prediction = result["data"][0]["label"];
+            
+            if (!expectedResults.includes(prediction)) {
+                chrome.runtime.sendMessage({ status: "loading" });
+            }
+            else {
+                chrome.runtime.sendMessage({ status: "running" });
+                return prediction;
+            }
+
+        } else {
+            console.log(`HTTP Response Code:`, response.status);
+        }
     } catch (error) {
         chrome.runtime.sendMessage({ status: "loading" });
         console.log(error);
-        return "error";
-    }
-        
-
-    if (response.ok) {
-
-        const result = await response.json();
-        const prediction = result["data"][0]["label"];
-        
-        if (prediction != "Abusive" && prediction != "Non-Abusive" && prediction != "No Profanity") {
-            console.log(prediction)
-            chrome.runtime.sendMessage({ status: "loading" });
-            return "loading";
-        }
-
-        chrome.runtime.sendMessage({ status: "running" });
-        
-        return prediction;
-
-    } else {
-        console.log(`HTTP Response Code:`, response.status);
-        return "error";
     }
         
 }
@@ -45,6 +41,23 @@ async function query(tweet) {
 function censor(tweetDiv) {
 
     tweetDiv.classList.add("censored");
+
+    // Set the image source and alt text
+    const img = document.createElement('img');
+    img.src = chrome.runtime.getURL("images/report.png");
+    img.alt = 'Mark as wrong censorship';
+    img.classList.add("report-img");
+    parent = tweetDiv.parentNode.parentNode;
+
+    tweetDiv.insertAdjacentElement('afterend', img);
+
+    parent.addEventListener("mouseover", () => {
+        img.style.display = "block";
+    });
+    
+    parent.addEventListener("mouseout", () => {
+        img.style.display = "none";
+    });
 
     tweetDiv.addEventListener('click', function(event) {
 
@@ -69,7 +82,12 @@ function censor(tweetDiv) {
         }
 
     });
-   
+
+    // Add an event listener to the image
+    img.addEventListener('click', (event) => {
+        event.stopPropagation();
+        console.log('Image clicked!', tweetDiv.innerText.replace(/[\r\n]/gm, ' '));
+    });
 
 }
 
@@ -90,76 +108,70 @@ function getUsername(tweet) {
 
 function getTweets() {
 
-    chrome.runtime.sendMessage({ popup: "update"});
+    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
 
-    query("test").then(result => {
+    for (let i = 0; i < tweets.length; i++) { 
 
-        if (result == "error" || result == "loading") { 
-            console.log(result);
-            return; 
-        } 
+        var tweetDivs = tweets[i].querySelectorAll('[data-testid="tweet"] [lang]');
+        var usernameDivs = tweets[i].querySelectorAll('[data-testid="User-Name"]');
 
-        const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+        for (let j = 0; j < tweetDivs.length; j++) {
 
-        for (let i = 0; i < tweets.length; i++) { 
-    
-            var tweetDivs = tweets[i].querySelectorAll('[data-testid="tweet"] [lang]');
-            var usernameDivs = tweets[i].querySelectorAll('[data-testid="User-Name"]');
-    
-            for (let j = 0; j < tweetDivs.length; j++) {
-    
-                const tweetDiv = tweetDivs[j];
-                const usernameDiv = usernameDivs[j];
+            const tweetDiv = tweetDivs[j];
+            const usernameDiv = usernameDivs[j];
+            
+            const language = tweetDiv.getAttribute("lang");
+            const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            const username = getUsername(usernameDiv.innerText);
+
+            if (!tweetDiv.classList.contains("checked")) {
+                tweetDiv.classList.add("checked");
+            }
+
+            chrome.runtime.sendMessage({action: "get"}, function(response) {
+                // console.log(response.tweets);
+                const savedTweets = response.tweets;   
+
+                if (savedTweets.includes(tweet)) {
+
+                    chrome.runtime.sendMessage({ action: "compare", tweet: tweet, username: username }, function(response) {
                 
-                const language = tweetDiv.getAttribute("lang");
-                const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-                const username = getUsername(usernameDiv.innerText);
+                        if (response.result.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
+                            console.log("Censoring:", tweet);
+                            censor(tweetDiv);
+                        }
     
-                if (!tweetDiv.classList.contains("checked")) {
-                    tweetDiv.classList.add("checked");
+                    });
+    
+                    return;
                 }
                 
-                if (language != "tl") {
-                    continue;
-                }
-    
-                chrome.runtime.sendMessage({action: "get"}, function(response) {
-                    // console.log(response.tweets);
-                    const savedTweets = response.tweets;   
-    
-                    if (savedTweets.includes(tweet)) {
-    
-                        chrome.runtime.sendMessage({ action: "compare", tweet: tweet, username: username }, function(response) {
-                    
-                            if (response.result.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
-                                console.log("Censoring:", tweet);
-                                censor(tweetDiv);
-                            }
-        
-                        });
-        
+                query(tweet).then(result => {
+
+                    if (!result) {
                         return;
                     }
-                    
-                    query(tweet).then(result => {
+
+                    console.log(tweet, result);
     
-                        console.log(tweet, result);
-        
-                        const prediction = result;
-                        const data = { tweet, username, prediction };
-                        
-                        chrome.runtime.sendMessage({ 
-                            action: "push",
-                            tweet: data
-                        });
+                    let prediction = result;
 
-                    }); 
-                });  
-            }
+                    if (language != "tl") {
+                        prediction = "Not Tagalog";
+                    }
+
+                    const data = { tweet, username, prediction };
+                    
+                    chrome.runtime.sendMessage({ 
+                        action: "push",
+                        tweet: data
+                    });
+
+                }); 
+            });  
         }
+    }
 
-
-    }); 
     
 
 }
@@ -201,35 +213,40 @@ function showOverlay() {
 if (document.readyState !== 'loading') {
 
     let intervalID;
+    let running = false;
 
-    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-
+    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+        
+        if (intervalID) {
+            clearInterval(intervalID);
+        }
+        
         // document.getElementById("censoredCount").textContent = request.value;
 
         // Check if the message is a tab update message
-        if (request.tabUpdated) {
+        if (message.activeTab == true) {
+
             getTweets();
             
-            console.log("wewe");
             showOverlay();
-            
-        } 
 
-        let running = false;
+            intervalID = setInterval(function() {
+                // Listen for message from background.js
+                if (!running) {
+                    
+                    running = true;
 
-        intervalID = setInterval(function() {
-            // Listen for message from background.js
-            if (!running) {
+                    getTweets();
+
+                    chrome.runtime.sendMessage({ popup: "update"});
+
+                    running = false;
                 
-                running = true;
-                getTweets();
-                running = false;
-            
-            }
-        }, 600);
+                }
+            }, 600);
+        } 
+        
     });
-
-    
 
 }
  
