@@ -18,15 +18,23 @@ window.addEventListener('load', function() {
       feedCensoredCount.textContent = response.feedCensoredCount;
       censoredRatio.textContent = response.censoredRatio;
       censoredCount.textContent = response.censoredCount;
-    
-      if (response.censoredRatio >= 50 && response.tweetCount >= 10) {
+
+      if (response.tweetCount == 1) {
+        censoredResult.innerText = 1;
+        censoredResult.style.color = "#e69393";
+      }
+      else if (response.censoredRatio >= 50 && response.tweetCount >= 10) {
         censoredResult.style.color = "#e69393";
       }
       else {
         censoredResult.style.color = "#b4e092";
       }
     
-      if (response.feedCensoredRatio >= 50 && response.feedTweetCount >= 10) {
+      if (response.tweetCount == 1) {
+        feedCensoredResult.innerText = 1;
+        feedCensoredResult.style.color = "#e69393";
+      }
+      else if (response.feedCensoredRatio >= 50 && response.feedTweetCount >= 10) {
         feedCensoredResult.style.color = "#e69393";
       }
       else {
