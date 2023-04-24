@@ -38,9 +38,11 @@ async function query(tweet) {
 }
 
 
-function censor(tweetDiv) {
+function censor(tweetDiv, tweetObj) {
 
     tweetDiv.classList.add("censored");
+    // TODO get reportedTweets
+    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
     // Set the image source and alt text
     const img = document.createElement('img');
@@ -86,7 +88,8 @@ function censor(tweetDiv) {
     // Add an event listener to the image
     img.addEventListener('click', (event) => {
         event.stopPropagation();
-        console.log('Image clicked!', tweetDiv.innerText.replace(/[\r\n]/gm, ' '));
+        chrome.runtime.sendMessage({action: "report", tweet: tweetObj});
+        alert('Tweet reported successfully.\nThank you for your feedback.');
     });
 
 }
@@ -132,13 +135,17 @@ function getTweets() {
                 // console.log(response.tweets);
                 const savedTweets = response.tweets;   
 
+                console.log(savedTweets);
+
                 if (savedTweets.includes(tweet)) {
 
-                    chrome.runtime.sendMessage({ action: "compare", tweet: tweet, username: username }, function(response) {
+                    const data = { tweet, username };
+
+                    chrome.runtime.sendMessage({ action: "compare", tweet: data}, function(response) {
                 
-                        if (response.result.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
-                            console.log("Censoring:", tweet);
-                            censor(tweetDiv);
+                        if (response.tweet.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
+                            // console.log("Censoring:", tweet);
+                            censor(tweetDiv, response.tweet);
                         }
     
                     });
@@ -152,15 +159,16 @@ function getTweets() {
                         return;
                     }
 
-                    console.log(tweet, result);
-    
+                    const reported = false;
                     let prediction = result;
 
-                    if (language != "tl") {
+                    if (language === "en") {
                         prediction = "Not Tagalog";
                     }
 
-                    const data = { tweet, username, prediction };
+                    const data = { tweet, username, prediction, reported };
+
+                    // console.log({tweet, prediction});
                     
                     chrome.runtime.sendMessage({ 
                         action: "push",
@@ -198,7 +206,7 @@ function showOverlay() {
             
             document.body.removeChild(overlayDiv);
         }
-        else if (checkCount === 7) {
+        else if (checkCount === 10) {
             clearInterval(intervalID);
             document.body.removeChild(overlayDiv);
         }

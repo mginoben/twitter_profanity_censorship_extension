@@ -22,8 +22,27 @@ function computeCensoredRatio(listOfTweet) {
   return Math.round(ratio);
 }
 
-function findTweet(listOfTweet, newTweet) {
-  return listOfTweet.some(obj => obj.tweet === newTweet.tweet && obj.username === newTweet.username);
+function findTweet(tweetObj, reported) {
+  let foundTweet;
+  for (let i = 0; i < tweetPredictions.length; i++) {
+
+    const tweet = tweetPredictions[i].tweet;
+    const username = tweetPredictions[i].username;
+    const prediction = tweetPredictions[i].prediction;
+
+    if (tweet === tweetObj.tweet && username === tweetObj.username) {
+      if (reported) {
+        
+        const reported = true;
+        tweetPredictions[i] = { tweet, username, prediction, reported };
+        console.log("REPORTED:", tweet);
+
+      }
+      foundTweet = tweetPredictions[i];
+      break;
+    }
+  } 
+  return foundTweet;
 }
 
 function countAbusive(listOfTweet) {
@@ -81,11 +100,11 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
   }
   
   if (response.action === "push") {
-    
-    const tweet = response.tweet;
 
-    if (!findTweet(tweetPredictions, tweet)) {
-      tweetPredictions.push(tweet);
+    const foundTweet = findTweet(response.tweet, false);
+
+    if (!foundTweet) {
+      tweetPredictions.push(response.tweet);
     }
 
   }
@@ -97,21 +116,15 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
   }
   else if (response.action === "compare") {
 
-    for (let i = 0; i < tweetPredictions.length; i++) {
-      const tweet = tweetPredictions[i];
-      if (tweet.tweet === response.tweet && tweet.username === response.username) {
-        
-        sendResponse({ result: tweet});
+    const foundTweet = findTweet(response.tweet, false);
 
-        if (!findTweet(feedTweetPredictions, tweet)) {
-          feedTweetPredictions.push(tweet);
-        }
+    if (foundTweet) {
+      sendResponse({ tweet: foundTweet });
+    }
 
-        break;
-      }
-
-    } 
-
+  }
+  else if (response.action === "report") {
+    findTweet(response.tweet, true);
   }
 
 });
