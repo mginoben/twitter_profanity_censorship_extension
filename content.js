@@ -38,11 +38,9 @@ async function query(tweet) {
 }
 
 
-function censor(tweetDiv, tweetObj) {
+function censor(tweetDiv) {
 
     tweetDiv.classList.add("censored");
-    // TODO get reportedTweets
-    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
     // Set the image source and alt text
     const img = document.createElement('img');
@@ -88,8 +86,7 @@ function censor(tweetDiv, tweetObj) {
     // Add an event listener to the image
     img.addEventListener('click', (event) => {
         event.stopPropagation();
-        chrome.runtime.sendMessage({action: "report", tweet: tweetObj});
-        alert('Tweet reported successfully.\nThank you for your feedback.');
+        console.log('Image clicked!', tweetDiv.innerText.replace(/[\r\n]/gm, ' '));
     });
 
 }
@@ -120,62 +117,53 @@ function getTweets() {
 
         for (let j = 0; j < tweetDivs.length; j++) {
 
+            let running = false;
             const tweetDiv = tweetDivs[j];
-            const usernameDiv = usernameDivs[j];
-            
             const language = tweetDiv.getAttribute("lang");
             const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-            const username = getUsername(usernameDiv.innerText);
-
-            if (!tweetDiv.classList.contains("checked")) {
-                tweetDiv.classList.add("checked");
-            }
 
             chrome.runtime.sendMessage({action: "get"}, function(response) {
-                // console.log(response.tweets);
-                const savedTweets = response.tweets;   
-
-                console.log(savedTweets);
-
-                if (savedTweets.includes(tweet)) {
-
-                    const data = { tweet, username };
-
-                    chrome.runtime.sendMessage({ action: "compare", tweet: data}, function(response) {
                 
-                        if (response.tweet.prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
-                            // console.log("Censoring:", tweet);
-                            censor(tweetDiv, response.tweet);
+                if (!tweetDiv.classList.contains("checked")) {
+                    tweetDiv.classList.add("checked");
+                }
+
+                if (response.tweets.includes(tweet)) {
+
+                    chrome.runtime.sendMessage({ action: "compare", tweet: tweet }, function(response) {
+
+                        if (response.abusive === true && !tweetDiv.classList.contains("censored")) {
+                            censor(tweetDiv);
                         }
     
                     });
     
                     return;
                 }
-                
+
                 query(tweet).then(result => {
 
                     if (!result) {
                         return;
                     }
 
-                    const reported = false;
                     let prediction = result;
 
                     if (language === "en") {
                         prediction = "Not Tagalog";
                     }
 
-                    const data = { tweet, username, prediction, reported };
-
-                    // console.log({tweet, prediction});
+                    const tweetObj = { tweet, prediction };
                     
+                    console.log(tweetObj);
+
                     chrome.runtime.sendMessage({ 
                         action: "push",
-                        tweet: data
+                        tweetObj: tweetObj
                     });
 
-                }); 
+                });                    
+                 
             });  
         }
     }
@@ -206,7 +194,7 @@ function showOverlay() {
             
             document.body.removeChild(overlayDiv);
         }
-        else if (checkCount === 10) {
+        else if (checkCount === 8) {
             clearInterval(intervalID);
             document.body.removeChild(overlayDiv);
         }
@@ -228,15 +216,10 @@ if (document.readyState !== 'loading') {
         if (intervalID) {
             clearInterval(intervalID);
         }
-        
         // document.getElementById("censoredCount").textContent = request.value;
 
         // Check if the message is a tab update message
-        if (message.activeTab == true) {
-
-            getTweets();
-            
-            showOverlay();
+        if (message.hasTweets) {
 
             intervalID = setInterval(function() {
                 // Listen for message from background.js
@@ -252,6 +235,8 @@ if (document.readyState !== 'loading') {
                 
                 }
             }, 600);
+
+            showOverlay();
         } 
         
     });

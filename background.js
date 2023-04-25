@@ -1,6 +1,5 @@
 let tweetPredictions = [];
 let feedTweetPredictions = [];
-let previousUrl = '';
 let tweetsTab;
 let notTweetTabs = ["messages", "twitter_blue", "verified-orgs-signup", "notifications", "bookmarks", "lists"];
 
@@ -22,31 +21,27 @@ function computeCensoredRatio(listOfTweet) {
   return Math.round(ratio);
 }
 
-function findTweet(tweetObj, reported) {
+function findTweet(listOfTweet, tweet) {
+  if (!listOfTweet) {
+    return;
+  }
+
   let foundTweet;
-  for (let i = 0; i < tweetPredictions.length; i++) {
 
-    const tweet = tweetPredictions[i].tweet;
-    const username = tweetPredictions[i].username;
-    const prediction = tweetPredictions[i].prediction;
-
-    if (tweet === tweetObj.tweet && username === tweetObj.username) {
-      if (reported) {
-        
-        const reported = true;
-        tweetPredictions[i] = { tweet, username, prediction, reported };
-        console.log("REPORTED:", tweet);
-
-      }
-      foundTweet = tweetPredictions[i];
+  for (let i = 0; i < listOfTweet.length; i++) {
+    const tweetObj = listOfTweet[i];
+    if (tweetObj.tweet === tweet) {
+      foundTweet = tweetObj;
       break;
     }
-  } 
+    
+  }
+
   return foundTweet;
 }
 
 function countAbusive(listOfTweet) {
-  let count =0;
+  let count = 0;
   
   listOfTweet.forEach(tweet => {
     if (tweet.prediction === "Abusive") {
@@ -60,10 +55,23 @@ function countAbusive(listOfTweet) {
 function sendMessage(message) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     var tab = tabs[0];
-    if (tab) {
+    if (tab && tab.url.match('https:\/\/twitter.com\/.*')) {
+      console.log("SENDING MESSAGE TO CONTENT");
       chrome.tabs.sendMessage(tab.id, message);
     }
   });
+}
+
+function hasTweets(url) {
+  if (!url.includes("search")) {
+    for (let i = 0; i < notTweetTabs.length; i++) {
+      const urlString = notTweetTabs[i];
+      if (url.includes(urlString)){
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 // Listen for messages from the content script
@@ -85,8 +93,7 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     chrome.action.setBadgeTextColor({ color: 'white', tabId: sender.tab.id  });
     chrome.action.setBadgeBackgroundColor({ color: "#8b0000", tabId: sender.tab.id });
   }
-
-  if (response.status === "running") {
+  else if (response.status === "running") {
     chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
     chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
 
@@ -99,32 +106,33 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
 
   }
   
-  if (response.action === "push") {
-
-    const foundTweet = findTweet(response.tweet, false);
-
-    if (!foundTweet) {
-      tweetPredictions.push(response.tweet);
+  else if (response.action === "push") {
+    if (!findTweet(tweetPredictions, response.tweetObj.tweet)) {
+      tweetPredictions.push(response.tweetObj);
+      console.log(tweetPredictions);
     }
-
   }
+
   else if (response.action == "get") {
-
-    const tweets = tweetPredictions.map(obj => obj.tweet);
-    sendResponse({ tweets: tweets });
-
+    sendResponse({ tweets: tweetPredictions.map(obj => obj.tweet) });
   }
+  
   else if (response.action === "compare") {
 
-    const foundTweet = findTweet(response.tweet, false);
+    const tweet = response.tweet;
+    const foundTweet = findTweet(tweetPredictions, tweet);
 
-    if (foundTweet) {
-      sendResponse({ tweet: foundTweet });
+    if (foundTweet && foundTweet.prediction === "Abusive") {
+      sendResponse({ abusive: true });
+    }
+    else{
+      sendResponse({ abusive: false });
     }
 
-  }
-  else if (response.action === "report") {
-    findTweet(response.tweet, true);
+    if (!findTweet(feedTweetPredictions, tweet)) {
+      feedTweetPredictions.push(foundTweet);
+    }
+
   }
 
 });
@@ -147,39 +155,23 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
-  if (changeInfo && changeInfo.status === "complete") {
+    console.log(changeInfo);
 
-    if (tab.url !== previousUrl && tab.url.includes("https://twitter.com/")) {
+    if (changeInfo.title && tab.url.includes("https://twitter.com/")) {
+      
+      chrome.action.setPopup({popup: "popup.html"});
 
       tweetsTab = true;
-
-      chrome.action.setPopup({popup: "popup.html"});
    
-      console.log(tab.url);
-      previousUrl = tab.url;
       feedTweetPredictions.length = 0;
       // Send a message to the content script
 
-      if (!tab.url.includes("search")) {
-        notTweetTabs.forEach(urlString => {
-          if (tab.url.includes(urlString)){
-            tweetsTab = false;
-          }
-        });
-      }
-
-      if (tweetsTab) {
-        sendMessage({ activeTab: true,  tabUrl: tab.url});
+      if (hasTweets(tab.url)) {
+        console.log("Has TWEETS");
+        sendMessage({ hasTweets: true});
       }
 
     }
-    else {
-      chrome.action.setPopup({popup: ""});
-      sendMessage({ activeTab: false });
-    }
-  }
-
-
 
 });
 
