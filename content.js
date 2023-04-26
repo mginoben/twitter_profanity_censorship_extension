@@ -1,6 +1,5 @@
 
 async function query(tweet) {
-
     try {
 
         const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
@@ -64,10 +63,11 @@ function censor(tweetDiv) {
 
     });
 
-    chrome.runtime.sendMessage({action: "get_reported_tweets"}, function (response) {
-        const reportedTweets = response.tweets;
+    chrome.runtime.sendMessage({action: "get_reported"}, function (response) {
 
-        if (!reportedTweets.includes(tweet)) {
+        const reportedTweets = response.reportedTweets;
+
+        if (reportedTweets && !reportedTweets.includes(tweet)) {
             const img = document.createElement('img');
             img.src = chrome.runtime.getURL("images/report.png");
             img.alt = 'Mark as wrong censorship';
@@ -88,8 +88,8 @@ function censor(tweetDiv) {
             img.addEventListener('click', (event) => {
                 event.stopPropagation();
                 alert("Tweet reported successfully.\nThank you for your feedback");
-                tweetDiv.classList.add("reported");
                 tweetDiv.parentNode.removeChild(img);
+                console.log("Reported...", tweet);
                 chrome.runtime.sendMessage({action: "report", tweet: tweet});
             });
         }
@@ -113,47 +113,105 @@ function getUsername(tweet) {
 
 }
 
-function getTweets() {
+// Inject the overlay HTML into the current page
+function showOverlay() {
+    // Create a new MutationObserver and pass it a callback function
+    const observer = new MutationObserver(function(mutations) {
+        // For each mutation in the list of mutations
+        mutations.forEach(function(mutation) {
+            const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
 
-    const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+            if (tweetDivs.length > 0) {
 
-    for (let i = 0; i < tweets.length; i++) { 
-
-        var tweetDivs = tweets[i].querySelectorAll('[data-testid="tweet"] [lang]');
-        var usernameDivs = tweets[i].querySelectorAll('[data-testid="User-Name"]');
-
-        for (let j = 0; j < tweetDivs.length; j++) {
-
-            
-
-            const tweetDiv = tweetDivs[j];
-            const language = tweetDiv.getAttribute("lang");
-            const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-
-            chrome.runtime.sendMessage({action: "get"}, function(response) {
-
-                if (!tweetDiv.classList.contains("checked")) {
-                    tweetDiv.classList.add("checked");
-                }
+                // Disconnect the observer since we no longer need it
+                observer.disconnect();
                 
-                if (response.tweets.includes(tweet)) {
-
-                    chrome.runtime.sendMessage({ action: "compare", tweet: tweet }, function(response) {
-
-                        if (response.abusive === true && !tweetDiv.classList.contains("censored")) {
-                            censor(tweetDiv);
+                for (const tweetDiv of tweetDivs) {
+                    
+                    if (tweetDiv.classList.contains("saved")) {
+                        continue;
+                    }
+        
+                    const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+                    const overlayDiv = document.createElement('div');
+                    overlayDiv.style.backgroundColor = bodyColor;
+                    overlayDiv.classList.add('overlay');
+                    tweetDiv.parentNode.appendChild(overlayDiv);
+                    
+                    let count = 0;
+        
+                    const intervalID = setInterval(function() {
+        
+                        if (tweetDiv.classList.contains("saved")) {
+                            clearInterval(intervalID);
+                            tweetDiv.parentNode.removeChild(overlayDiv);
                         }
-
-                        if (response) {
-                            chrome.runtime.sendMessage({ status: "running" });
+                        else if (count === 10) {
+                            clearInterval(intervalID);
+                            tweetDiv.parentNode.removeChild(overlayDiv);
                         }
-    
-                    });
-    
-                    return;
+                
+                        count++;
+                            
+                    }, 500);  
                 }
-                else {
+        
+            }
+
+        });
+
+    });
+    
+    // Start observing changes to the document body
+    observer.observe(document.body, { childList: true, subtree: true });
+
+}
+
+function findTweet(listOfTweet, tweet) {
+
+    for (let i = 0; i < listOfTweet.length; i++) {
+      const tweetObj = listOfTweet[i];
+      if (tweetObj.tweet === tweet) {
+        return tweetObj;
+      }
+    }
+  
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    
+    if (message.tab == "updated") {
+        console.log("Hiding tweets");
+        showOverlay();
+    }
+
+});
+
+const intervalID = setInterval(function() {
+    
+    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+
+    if (tweetDivs.length > 0) {
+        chrome.runtime.sendMessage({action: "get_tweets"}, function(response) {
+
+            const tweetPredictions = response.tweetPredictions;
+
+            for (const tweetDiv of tweetDivs) {
+
+                if (!tweetDiv.classList.contains("saved")) {
+                    tweetDiv.classList.add("saved");
+                }
+
+                const language = tweetDiv.getAttribute("lang");
+                const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+                const foundTweet = findTweet(tweetPredictions, tweet);
+                
+                // If not found then predict and save
+                if (!foundTweet) {
+
                     query(tweet).then(result => {
+
+                        console.log("Predicting...", tweet);
 
                         if (!result) {
                             chrome.runtime.sendMessage({ status: "loading" });
@@ -165,102 +223,35 @@ function getTweets() {
                         if (language === "en") {
                             prediction = "Not Tagalog";
                         }
-    
-                        const tweetObj = { tweet, prediction };
-                        
-                        console.log(tweetObj);
-    
+
                         chrome.runtime.sendMessage({ 
-                            action: "push",
-                            tweetObj: tweetObj
+                            action: "save_tweet",
+                            tweet: tweet,
+                            prediction: prediction
                         });
+
+                        console.log(prediction);
     
-                    }); 
+                    });
+
+                    continue;
+
                 }
 
-            });  
-        }
-    }
-
-    
-
-}
-
-// Inject the overlay HTML into the current page
-function showOverlay() {
-
-    const tweetArticles = document.querySelectorAll('article[data-testid="tweet"]');
-
-    for (let i = 0; i < tweetArticles.length; i++) { 
-
-        const article = tweetArticles[i];
-
-        if (article.querySelector(".checked")) { continue; }
-
-        let checkCount = 0;
-        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-        const overlayDiv = document.createElement('div');
-        overlayDiv.style.backgroundColor = bodyColor;
-        overlayDiv.classList.add('overlay');
-        article.appendChild(overlayDiv);
-    
-        // Remove if tweets are already  checked
-        const intervalID = setInterval(function() {
-    
-            const tweet = article.querySelector('[data-testid="tweet"] [lang]');
-            const overlayDiv = article.querySelector(".overlay");
-    
-    
-            if (overlayDiv && tweet && tweet.classList.contains("checked")) {
-                clearInterval(intervalID);
-                article.removeChild(overlayDiv);
-            }
-            else if (checkCount === 8) {
-                clearInterval(intervalID);
-                article.removeChild(overlayDiv);
-            }
-    
-            checkCount ++;
-                
-        }, 600);    
-    }
-}
-
-
-if (document.readyState !== 'loading') {
-
-    let intervalID;
-    let running = false;
-
-    chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-
-        // document.getElementById("censoredCount").textContent = request.value;
-
-        // Check if the message is a tab update message
-
-
-            intervalID = setInterval(function() {
-                // Listen for message from background.js
-                if (!running) {
-                    
-                    running = true;
-
-                    getTweets();
-
-                    showOverlay();
-
-                    chrome.runtime.sendMessage({ popup: "update"});
-
-                    running = false;
-                
+                // If in saved and abusive
+                if (foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
+                    console.log("Censoring...", tweet);
+                    censor(tweetDiv);
+                    tweetDiv.classList.add("censored");
                 }
-            }, 600);
-
-            
         
-        
-    });
+            }
 
-}
- 
+        });
+
+    }
+
+        
+}, 800);
+
 
