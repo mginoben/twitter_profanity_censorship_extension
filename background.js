@@ -1,5 +1,6 @@
 let tweetPredictions = [];
 let feedTweetPredictions = [];
+let reportedTweets = [];
 let tweetsTab;
 let notTweetTabs = ["messages", "twitter_blue", "verified-orgs-signup", "notifications", "bookmarks", "lists"];
 
@@ -56,7 +57,6 @@ function sendMessage(message) {
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     var tab = tabs[0];
     if (tab && tab.url.match('https:\/\/twitter.com\/.*')) {
-      console.log("SENDING MESSAGE TO CONTENT");
       chrome.tabs.sendMessage(tab.id, message);
     }
   });
@@ -105,11 +105,10 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     }
 
   }
-  
   else if (response.action === "push") {
     if (!findTweet(tweetPredictions, response.tweetObj.tweet)) {
+      console.log("ADDED:", response.tweetObj);
       tweetPredictions.push(response.tweetObj);
-      console.log(tweetPredictions);
     }
   }
 
@@ -134,15 +133,23 @@ chrome.runtime.onMessage.addListener((response, sender, sendResponse) => {
     }
 
   }
+  else if (response.action === "report") {
+    const foundTweet = findTweet(tweetPredictions, response.tweet);
+    if (foundTweet && !findTweet(reportedTweets, response.tweet)) {
+      console.log("REPORTED:", foundTweet);
+      reportedTweets.push(foundTweet);
+    }
+  }
+  else if (response.action === "get_reported_tweets") {
+    sendResponse({ tweets: reportedTweets.map(obj => obj.tweet) });
+  }
 
 });
 
 chrome.tabs.onActivated.addListener(function(activeInfo) {
   // This will log the ID of the newly activated tab
-  console.log(activeInfo.tabId);
   // You can also use chrome.tabs.get to get the details of the newly activated tab
   chrome.tabs.get(activeInfo.tabId, function(tab) {
-    console.log(tab.url);
     if (tab.url.includes("https://twitter.com/")) {
       chrome.action.setPopup({popup: "popup.html"});
     }
@@ -155,8 +162,6 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
-    console.log(changeInfo);
-
     if (changeInfo.title && tab.url.includes("https://twitter.com/")) {
       
       chrome.action.setPopup({popup: "popup.html"});
@@ -167,7 +172,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       // Send a message to the content script
 
       if (hasTweets(tab.url)) {
-        console.log("Has TWEETS");
         sendMessage({ hasTweets: true});
       }
 

@@ -1,6 +1,6 @@
 {
   "name": "Twitter Profanity",
-  "description": "A simple Chrome extension to get the highlighted text on any website.",
+  "description": "Censors tweets that contains abusive profanity based on context.",
   "version": "1.0",
   "manifest_version": 3,
   "action": {

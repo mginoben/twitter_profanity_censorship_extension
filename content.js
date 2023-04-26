@@ -14,25 +14,21 @@ async function query(tweet) {
         });
 
         if (response.ok) {
-            let intervalID;
             const expectedResults = ["Abusive", "Non-Abusive", "No Profanity"];
             const result = await response.json();
             const prediction = result["data"][0]["label"];
             
-            if (!expectedResults.includes(prediction)) {
-                chrome.runtime.sendMessage({ status: "loading" });
-            }
-            else {
+            if (expectedResults.includes(prediction)) {
                 chrome.runtime.sendMessage({ status: "running" });
                 return prediction;
             }
+
 
         } else {
             console.log(`HTTP Response Code:`, response.status);
         }
     } catch (error) {
-        chrome.runtime.sendMessage({ status: "loading" });
-        console.log(error);
+        console.log("Loading model please wait...");
     }
         
 }
@@ -40,24 +36,9 @@ async function query(tweet) {
 
 function censor(tweetDiv) {
 
+    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+
     tweetDiv.classList.add("censored");
-
-    // Set the image source and alt text
-    const img = document.createElement('img');
-    img.src = chrome.runtime.getURL("images/report.png");
-    img.alt = 'Mark as wrong censorship';
-    img.classList.add("report-img");
-    parent = tweetDiv.parentNode.parentNode;
-
-    tweetDiv.insertAdjacentElement('afterend', img);
-
-    parent.addEventListener("mouseover", () => {
-        img.style.display = "block";
-    });
-    
-    parent.addEventListener("mouseout", () => {
-        img.style.display = "none";
-    });
 
     tweetDiv.addEventListener('click', function(event) {
 
@@ -83,10 +64,36 @@ function censor(tweetDiv) {
 
     });
 
-    // Add an event listener to the image
-    img.addEventListener('click', (event) => {
-        event.stopPropagation();
-        console.log('Image clicked!', tweetDiv.innerText.replace(/[\r\n]/gm, ' '));
+    chrome.runtime.sendMessage({action: "get_reported_tweets"}, function (response) {
+        const reportedTweets = response.tweets;
+
+        if (!reportedTweets.includes(tweet)) {
+            const img = document.createElement('img');
+            img.src = chrome.runtime.getURL("images/report.png");
+            img.alt = 'Mark as wrong censorship';
+            img.classList.add("report-img");
+            parent = tweetDiv.parentNode.parentNode;
+
+            tweetDiv.insertAdjacentElement('afterend', img);
+
+            parent.addEventListener("mouseover", () => {
+                img.style.display = "block";
+            });
+            
+            parent.addEventListener("mouseout", () => {
+                img.style.display = "none";
+            });
+
+                // Add an event listener to the image
+            img.addEventListener('click', (event) => {
+                event.stopPropagation();
+                alert("Tweet reported successfully.\nThank you for your feedback");
+                tweetDiv.classList.add("reported");
+                tweetDiv.parentNode.removeChild(img);
+                chrome.runtime.sendMessage({action: "report", tweet: tweet});
+            });
+        }
+
     });
 
 }
@@ -117,17 +124,18 @@ function getTweets() {
 
         for (let j = 0; j < tweetDivs.length; j++) {
 
-            let running = false;
+            
+
             const tweetDiv = tweetDivs[j];
             const language = tweetDiv.getAttribute("lang");
             const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
             chrome.runtime.sendMessage({action: "get"}, function(response) {
-                
+
                 if (!tweetDiv.classList.contains("checked")) {
                     tweetDiv.classList.add("checked");
                 }
-
+                
                 if (response.tweets.includes(tweet)) {
 
                     chrome.runtime.sendMessage({ action: "compare", tweet: tweet }, function(response) {
@@ -135,35 +143,41 @@ function getTweets() {
                         if (response.abusive === true && !tweetDiv.classList.contains("censored")) {
                             censor(tweetDiv);
                         }
+
+                        if (response) {
+                            chrome.runtime.sendMessage({ status: "running" });
+                        }
     
                     });
     
                     return;
                 }
+                else {
+                    query(tweet).then(result => {
 
-                query(tweet).then(result => {
+                        if (!result) {
+                            chrome.runtime.sendMessage({ status: "loading" });
+                            return;
+                        }
+    
+                        let prediction = result;
+    
+                        if (language === "en") {
+                            prediction = "Not Tagalog";
+                        }
+    
+                        const tweetObj = { tweet, prediction };
+                        
+                        console.log(tweetObj);
+    
+                        chrome.runtime.sendMessage({ 
+                            action: "push",
+                            tweetObj: tweetObj
+                        });
+    
+                    }); 
+                }
 
-                    if (!result) {
-                        return;
-                    }
-
-                    let prediction = result;
-
-                    if (language === "en") {
-                        prediction = "Not Tagalog";
-                    }
-
-                    const tweetObj = { tweet, prediction };
-                    
-                    console.log(tweetObj);
-
-                    chrome.runtime.sendMessage({ 
-                        action: "push",
-                        tweetObj: tweetObj
-                    });
-
-                });                    
-                 
             });  
         }
     }
@@ -175,35 +189,42 @@ function getTweets() {
 // Inject the overlay HTML into the current page
 function showOverlay() {
 
-    let checkCount = 0;
-    const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-    const overlayDiv = document.createElement('div');
-    overlayDiv.style.backgroundColor = bodyColor;
-    overlayDiv.classList.add('overlay');
-    document.body.appendChild(overlayDiv);
+    const tweetArticles = document.querySelectorAll('article[data-testid="tweet"]');
 
-    // Remove if tweets are already  checked
-    const intervalID = setInterval(function() {
+    for (let i = 0; i < tweetArticles.length; i++) { 
 
-        const tweet = document.querySelector('[data-testid="tweet"] [lang]');
-        const overlayDiv = document.body.querySelector(".overlay");
+        const article = tweetArticles[i];
 
+        if (article.querySelector(".checked")) { continue; }
 
-        if (overlayDiv && tweet  && tweet.classList.contains("checked")) {
-            clearInterval(intervalID);
-            
-            document.body.removeChild(overlayDiv);
-        }
-        else if (checkCount === 8) {
-            clearInterval(intervalID);
-            document.body.removeChild(overlayDiv);
-        }
-
-        checkCount ++;
-            
-    }, 600);
+        let checkCount = 0;
+        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+        const overlayDiv = document.createElement('div');
+        overlayDiv.style.backgroundColor = bodyColor;
+        overlayDiv.classList.add('overlay');
+        article.appendChild(overlayDiv);
+    
+        // Remove if tweets are already  checked
+        const intervalID = setInterval(function() {
+    
+            const tweet = article.querySelector('[data-testid="tweet"] [lang]');
+            const overlayDiv = article.querySelector(".overlay");
+    
+    
+            if (overlayDiv && tweet && tweet.classList.contains("checked")) {
+                clearInterval(intervalID);
+                article.removeChild(overlayDiv);
+            }
+            else if (checkCount === 8) {
+                clearInterval(intervalID);
+                article.removeChild(overlayDiv);
+            }
+    
+            checkCount ++;
+                
+        }, 600);    
+    }
 }
-  
 
 
 if (document.readyState !== 'loading') {
@@ -212,14 +233,11 @@ if (document.readyState !== 'loading') {
     let running = false;
 
     chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-        
-        if (intervalID) {
-            clearInterval(intervalID);
-        }
+
         // document.getElementById("censoredCount").textContent = request.value;
 
         // Check if the message is a tab update message
-        if (message.hasTweets) {
+
 
             intervalID = setInterval(function() {
                 // Listen for message from background.js
@@ -229,6 +247,8 @@ if (document.readyState !== 'loading') {
 
                     getTweets();
 
+                    showOverlay();
+
                     chrome.runtime.sendMessage({ popup: "update"});
 
                     running = false;
@@ -236,8 +256,8 @@ if (document.readyState !== 'loading') {
                 }
             }, 600);
 
-            showOverlay();
-        } 
+            
+        
         
     });
 
