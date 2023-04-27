@@ -13,6 +13,7 @@ body {
     background-color:#1f1f1f;
     margin: 0px;
     width: 150px;
+    font-family: alte !important;
 }
 
 
@@ -22,7 +23,6 @@ body {
 
 .container div {
     font-size: 13px;
-    font-family: alte;
     text-align: center;
     display: flex;
     justify-content: center;
@@ -36,8 +36,8 @@ body {
 }
 
 .title {
-    padding: 2px;
-    font-weight: bold;
+    padding: 5px 2px;
+    font-weight: 300;
     font-size: 15px;
 }
 
@@ -55,16 +55,16 @@ body {
 .result {
     height: 20px;
     font-size: 13px;
-    font-family: alte;
     text-align: center; 
+    width: 100%;
 }
 
 
 .switch {
     position: relative;
     display: inline-block;
-    width: 40px;
-    height: 20px;
+    width: 60px;
+    height: 30px;
     margin: 10px;
 }
   
@@ -91,8 +91,8 @@ body {
 .slider:before {
     position: absolute;
     content: "";
-    height: 18px;
-    width: 18px;
+    height: 28px;
+    width: 28px;
     left: 1px;
     bottom: 1px;
     background-color: white;
@@ -109,9 +109,9 @@ input:focus + .slider {
 }
 
 input:checked + .slider:before {
-    -webkit-transform: translateX(26px);
-    -ms-transform: translateX(20px);
-    transform: translateX(20px);
+    -webkit-transform: translateX(30px);
+    -ms-transform: translateX(30px);
+    transform: translateX(30px);
 }
 
 /* Rounded sliders */

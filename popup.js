@@ -1,3 +1,4 @@
+let toggleState = false;
 
 window.addEventListener('load', function() {
 
@@ -7,8 +8,27 @@ window.addEventListener('load', function() {
   var feedCensoredRatio = document.getElementById("feedCensoredRatio");
   var censoredResult = document.getElementById("censoredResult");
   var feedCensoredResult = document.getElementById("feedCensoredResult");
+  var censorToggle = document.getElementById("censorToggle");
+  
+
+  chrome.runtime.sendMessage({toggle: "get"}, function(response) {
+
+    censorToggle.checked = response.toggleState;
+
+    censorToggle.addEventListener("change", function() {
+      if (this.checked) {
+        console.log("Checkbox is checked.");
+        chrome.runtime.sendMessage({toggle: true});
+      } else {
+        console.log("Checkbox is not checked.");
+        chrome.runtime.sendMessage({toggle: false});
+      }
+    });
+
+  });
 
   
+
 
   intervalID = setInterval(function() {
 
@@ -21,7 +41,7 @@ window.addEventListener('load', function() {
 
       if (response.tweetCount == 1) {
         censoredResult.innerText = 1;
-        censoredResult.style.color = "#e69393";
+        censoredResult.style.color = "#b4e092";
       }
       else if (response.censoredRatio >= 50 && response.tweetCount >= 10) {
         censoredResult.style.color = "#e69393";
@@ -32,7 +52,7 @@ window.addEventListener('load', function() {
     
       if (response.tweetCount == 1) {
         feedCensoredResult.innerText = 1;
-        feedCensoredResult.style.color = "#e69393";
+        feedCensoredResult.style.color = "#b4e092";
       }
       else if (response.feedCensoredRatio >= 50 && response.feedTweetCount >= 10) {
         feedCensoredResult.style.color = "#e69393";
@@ -43,38 +63,10 @@ window.addEventListener('load', function() {
 
     });
 
-  }, 600);
-
-
-
+  }, 800);
 
 });
 
-
-// window.addEventListener('load', function() {
-  
-//   chrome.runtime.onConnect.addListener(function(port) {
-//     if (port.name === "popupScript") {
-//       port.postMessage("ready");
-//       port.onMessage.addListener(function(msg) {
-//         console.log(msg);
-//       });
-//     }
-//   });
-  
-//   chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-//     if (message.currentTab) {
-//       console.log("GEGERERE");
-//     }
-//   });
-// });
-
-// // Listen for messages sent from the background script
-// window.addEventListener("message", function(event) {
-//   if (event.source == window && event.data.message) {
-//     console.log(event.data.message);
-//   }
-// });
 
 
 
