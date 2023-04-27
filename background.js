@@ -84,6 +84,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "get_tweets") {
+    console.log("Getting tweets ... no. of tweets:", tweetPredictions.length);
     sendResponse({ tweetPredictions: tweetPredictions });
   }
 

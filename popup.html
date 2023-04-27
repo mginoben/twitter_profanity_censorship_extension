@@ -6,37 +6,56 @@
   </head>
   <body>
     <div class="container">
+      <!-- EXTENSION SWITCH -->
+      <div>
+        <!-- Rounded switch -->
+        <label class="switch">
+          <input type="checkbox">
+          <span class="slider round"></span>
+        </label>
+      </div>
       <!-- ALL CENSORED TWEETS -->
-      <div>
-        <span class="title">Censored tweets since visiting Twitter</span>
-  
-        <div>
-          <p id="censoredResult">
-  
-            <span id="censoredCount">0</span> 
-            (<span id="censoredRatio">0</span>%)
-  
-          </p>
-        </div>
-  
+      <div class="highlighted">
+        <span class="title">Censored Tweets</span>
       </div>
 
-      <!-- NEWSFEED CENSORED TWEETS -->
-      <div>
-        <span class="title">Censored tweets on this feed</span>
-  
-        <div>
-          <p id="feedCensoredResult">
-  
-            <span id="feedCensoredCount">0</span> 
-            (<span id="feedCensoredRatio">0</span>%)
-  
-          </p>
+      <div class="censoredContent">
+        <div> 
+          <span class="subtitle">since visit</span>
+    
+          <div class="result">
+            <p id="censoredResult">
+    
+              <span id="censoredCount">0</span> 
+              (<span id="censoredRatio">0</span>%)
+    
+            </p>
+          </div>
+    
         </div>
   
+        <!-- NEWSFEED CENSORED TWEETS -->
+        <div>
+          <span class="subtitle">on this feed</span>
+    
+          <div class="result">
+            <p id="feedCensoredResult">
+    
+              <span id="feedCensoredCount">0</span> 
+              (<span id="feedCensoredRatio">0</span>%)
+    
+            </p>
+          </div>
+
+        </div>
+
       </div>
 
-    </div>
+      <div class="highlighted">
+        <span class="title">Icons Here</span>
+      </div>
+
+    
 
     <script src="popup.js"></script>
   </body>

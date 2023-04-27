@@ -9,9 +9,11 @@ body.loading {
 
 .censored {
   padding-right: 30px !important;
+  /* padding: 2px; */
 }
 
 .censored span {
+  padding: 1px;
   color: #8b8b8b !important;
   background-color: #8b8b8b;
   user-select: none; /* Standard syntax */
@@ -27,11 +29,12 @@ body.loading {
 }
 
 .censored img {
+  margin: 0px;
+  margin-bottom: -1px !important;
   content-visibility: hidden;
   /* visibility: hidden; */
   /* opacity: 0; */
   background-color: #8b8b8b; 
-  margin: 0;
   user-select: none; /* Standard syntax */
 }
 

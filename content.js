@@ -1,7 +1,6 @@
 
 async function query(tweet) {
     try {
-
         const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -22,11 +21,13 @@ async function query(tweet) {
                 return prediction;
             }
 
-
         } else {
-            console.log(`HTTP Response Code:`, response.status);
+            chrome.runtime.sendMessage({ status: "loading" });
+            console.log("Loading model please wait...");
+            // console.log(`HTTP Response Code:`, response.status);
         }
     } catch (error) {
+        chrome.runtime.sendMessage({ status: "loading" });
         console.log("Loading model please wait...");
     }
         
@@ -113,59 +114,75 @@ function getUsername(tweet) {
 
 }
 
-// Inject the overlay HTML into the current page
-function showOverlay() {
-    // Create a new MutationObserver and pass it a callback function
-    const observer = new MutationObserver(function(mutations) {
-        // For each mutation in the list of mutations
-        mutations.forEach(function(mutation) {
-            const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+function hideTweetDivs(tweetDivs) {
+        
+    for (const tweetDiv of tweetDivs) {
 
-            if (tweetDivs.length > 0) {
+        if (tweetDiv.classList.contains("done")) {
+            continue;
+        }
+        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+        const overlayDiv = document.createElement('div');
+        overlayDiv.style.backgroundColor = bodyColor;
+        overlayDiv.classList.add('overlay');
+        tweetDiv.parentNode.appendChild(overlayDiv);
+        
+        let count = 0;
 
-                // Disconnect the observer since we no longer need it
-                observer.disconnect();
+        const intervalID = setInterval(function() {
+
+            chrome.runtime.sendMessage({action: "get_tweets"}, function(response) { 
                 
-                for (const tweetDiv of tweetDivs) {
-                    
-                    if (tweetDiv.classList.contains("saved")) {
-                        continue;
-                    }
-        
-                    const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-                    const overlayDiv = document.createElement('div');
-                    overlayDiv.style.backgroundColor = bodyColor;
-                    overlayDiv.classList.add('overlay');
-                    tweetDiv.parentNode.appendChild(overlayDiv);
-                    
-                    let count = 0;
-        
-                    const intervalID = setInterval(function() {
-        
-                        if (tweetDiv.classList.contains("saved")) {
-                            clearInterval(intervalID);
-                            tweetDiv.parentNode.removeChild(overlayDiv);
-                        }
-                        else if (count === 10) {
-                            clearInterval(intervalID);
-                            tweetDiv.parentNode.removeChild(overlayDiv);
-                        }
+                const tweetPredictions = response.tweetPredictions;
+                const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+                const foundTweet = findTweet(tweetPredictions, tweet);
                 
-                        count++;
-                            
-                    }, 500);  
+                // If not found then predict and save
+                if (foundTweet) {
+                    clearInterval(intervalID);
+                    tweetDiv.parentNode.removeChild(overlayDiv);
+                }
+                else if (count === 10) {
+                    clearInterval(intervalID);
+                    tweetDiv.parentNode.removeChild(overlayDiv);
                 }
         
-            }
+                count++;
 
+            });
+
+        }, 500);  
+    }
+
+}
+
+// Inject the overlay HTML into the current page
+function showOverlay() {
+
+    // Wait for the tweets to load
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+            if (tweetDivs.length > 0) {
+                observer.disconnect();
+
+                hideTweetDivs(tweetDivs);  
+
+                // setInterval(function() {
+                //     const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+                //     hideTweetDivs(tweetDivs);     
+                // }, 500); 
+
+            }
         });
 
     });
     
-    // Start observing changes to the document body
+    // Observe for tweet div
     observer.observe(document.body, { childList: true, subtree: true });
 
 }
+
 
 function findTweet(listOfTweet, tweet) {
 
@@ -192,16 +209,16 @@ const intervalID = setInterval(function() {
     const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
 
     if (tweetDivs.length > 0) {
-        chrome.runtime.sendMessage({action: "get_tweets"}, function(response) {
+        
+        for (const tweetDiv of tweetDivs) {
 
-            const tweetPredictions = response.tweetPredictions;
+            if (tweetDiv.classList.contains("done")) {
+                continue;
+            }
 
-            for (const tweetDiv of tweetDivs) {
-
-                if (!tweetDiv.classList.contains("saved")) {
-                    tweetDiv.classList.add("saved");
-                }
-
+            chrome.runtime.sendMessage({action: "get_tweets"}, function(response) {
+                
+                const tweetPredictions = response.tweetPredictions;
                 const language = tweetDiv.getAttribute("lang");
                 const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
                 const foundTweet = findTweet(tweetPredictions, tweet);
@@ -209,17 +226,20 @@ const intervalID = setInterval(function() {
                 // If not found then predict and save
                 if (!foundTweet) {
 
-                    query(tweet).then(result => {
+                    query(tweet).then(prediction => {
 
-                        console.log("Predicting...", tweet);
+                        console.log("Predicting...");
 
-                        if (!result) {
-                            chrome.runtime.sendMessage({ status: "loading" });
+                        if (!prediction) {
                             return;
                         }
-    
-                        let prediction = result;
-    
+
+                        if (prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
+                            console.log("Censoring...", tweet);
+                            censor(tweetDiv);
+                            tweetDiv.classList.add("censored");
+                        }
+
                         if (language === "en") {
                             prediction = "Not Tagalog";
                         }
@@ -230,27 +250,25 @@ const intervalID = setInterval(function() {
                             prediction: prediction
                         });
 
-                        console.log(prediction);
-    
+                        console.log("Tweet:", tweet, "\nPrediction:", prediction);
+
                     });
 
-                    continue;
-
                 }
-
-                // If in saved and abusive
-                if (foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
+                // If tweet in saved and abusive
+                if (foundTweet && foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
                     console.log("Censoring...", tweet);
                     censor(tweetDiv);
                     tweetDiv.classList.add("censored");
                 }
-        
-            }
 
-        });
+                tweetDiv.classList.add("done");
+
+            });
+        
+        }
 
     }
-
         
 }, 800);
 
