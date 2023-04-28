@@ -64,7 +64,13 @@ function censor(tweetDiv) {
 
     });
 
+}
+
+
+function addReportButton(tweetDiv) {
     chrome.runtime.sendMessage({action: "get_reported"}, function (response) {
+
+        const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
         const reportedTweets = response.reportedTweets;
 
@@ -96,9 +102,7 @@ function censor(tweetDiv) {
         }
 
     });
-
 }
-
 
 function getUsername(tweet) {
 
@@ -221,6 +225,7 @@ setInterval(function() {
                     });
                 }
                 else {
+                    chrome.runtime.sendMessage({ status: "running" });
                     console.log("Tweet found:", foundTweet);
                     chrome.runtime.sendMessage({ 
                         action: "save_feed_tweet",
@@ -235,6 +240,8 @@ setInterval(function() {
                     censor(tweetDiv);
                     tweetDiv.classList.add("censored");
                 }
+
+                addReportButton(tweetDiv);
 
                 tweetDiv.classList.add("done");
 

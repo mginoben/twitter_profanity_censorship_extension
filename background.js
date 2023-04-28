@@ -2,6 +2,14 @@ let tweetPredictions = [];
 let feedTweetPredictions = [];
 let reportedTweets = [];
 let toggleState = false;
+let tweetCount;
+let censoredRatio;
+let censoredCount;
+let feedTweetCount;
+let feedCensoredCount;
+let feedCensoredRatio;
+
+
 
 
 function computeCensoredRatio(listOfTweet) {
@@ -54,17 +62,17 @@ function sendMessage(message) {
   });
 }
 
+chrome.action.setIcon({ path: "images/uncensored-128x128.png" });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.toggle === true) {
-    console.log("ON BB");
     toggleState = true;
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       var tabId = tabs[0].id;
       chrome.tabs.reload(tabId);
     });
-    
+    chrome.action.setIcon({ path: "images/censored-128x128.png" });
   }
   else if (message.toggle === false) {
     console.log("OFF BB");
@@ -73,21 +81,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       var tabId = tabs[0].id;
       chrome.tabs.reload(tabId);
     });    
+    chrome.action.setIcon({ path: "images/uncensored-128x128.png" });
   }else if (message.toggle === "get") {
     sendResponse({ toggleState: toggleState });
   }
 
   if (message.popup === "update") {
-    sendResponse({ 
-      censoredCount: countAbusive(tweetPredictions), 
-      censoredRatio: computeCensoredRatio(tweetPredictions),
-      feedCensoredCount: countAbusive(feedTweetPredictions),
-      feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
-      tweetCount: tweetPredictions.length,
-      feedTweetCount: feedTweetPredictions.length,
-      toggleState: toggleState
-    });
-
+    if (toggleState == true) {
+      sendResponse({ 
+        tweetCount: tweetPredictions.length,
+        censoredCount: countAbusive(tweetPredictions), 
+        censoredRatio: computeCensoredRatio(tweetPredictions),
+        feedTweetCount: feedTweetPredictions.length,
+        feedCensoredCount: countAbusive(feedTweetPredictions),
+        feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
+        toggleState: toggleState
+      });
+    }
+    else{
+      sendResponse({ 
+        tweetCount: 0,
+        censoredCount: 0, 
+        censoredRatio: 0,
+        feedTweetCount: 0,
+        feedCensoredCount: 0,
+        feedCensoredRatio: 0,
+        toggleState: toggleState
+      });
+    }
   }
 
   if (message.action == "save_tweet") {
@@ -142,18 +163,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.status === "running") {
 
     // Set popup
-    // chrome.action.setPopup({popup: "popup.html"});
+    chrome.action.setPopup({popup: "popup.html"});
 
     // Set badge behaviour
-    // if (countAbusive(tweetPredictions) > 0) {
-    //   chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
-    //   chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
-    //   chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
-    // }
-    // else {
-    //   chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
-    // }
-    
+    if (countAbusive(tweetPredictions) > 0) {
+      chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
+      chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
+      chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
+    }
+    else {
+      chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
+    }
     
   }
 
@@ -161,10 +181,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 chrome.tabs.onActivated.addListener(function(activeInfo) {
-  // This will log the ID of the newly activated tab
-  // You can also use chrome.tabs.get to get the details of the newly activated tab
+
   chrome.tabs.get(activeInfo.tabId, function(tab) {
     if (tab.url.includes("https://twitter.com/")) {
+
+      chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ["style.css"]
+      });
 
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -184,29 +208,31 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
     if (changeInfo.status == "complete" && tab.url.includes("https://twitter.com/")) {
       
-      if (toggleState) {
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["content.js"]
-        });
-  
+      if (toggleState === true) {
+
         chrome.scripting.insertCSS({
           target: { tabId: tab.id },
           files: ["style.css"]
         });
 
-        sendMessage({ tab: "updated"});
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["content.js"]
+        });
+
       }
-      else{
-        tweetPredictions.length = 0;
-      }
-      
+
+      // Convert list to JSON string
+      let tweetsList = JSON.stringify(tweetPredictions);
+
+      // Store JSON string on local storage
+      chrome.storage.local.set({tweetPredictions: tweetsList}, function() {
+        console.log("List saved to local storage.");
+      });
 
       chrome.action.setPopup({popup: "popup.html"});
    
       feedTweetPredictions.length = 0;
-
-      
 
     }
 
