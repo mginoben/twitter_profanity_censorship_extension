@@ -5,55 +5,52 @@
     <link rel="stylesheet" href="popupStyle.css">
   </head>
   <body>
+
     <div class="container">
+
       <!-- EXTENSION SWITCH -->
       <div>
-        <!-- Rounded switch -->
         <label class="switch">
           <input type="checkbox" id="censorToggle">
           <span class="slider round"></span>
         </label>
       </div>
-      <!-- ALL CENSORED TWEETS -->
+
+      
       <div class="highlighted">
         <span class="title">Censored Tweets</span>
       </div>
 
       <div id="censoredContent">
+
+        <!-- ALL CENSORED TWEETS -->
         <div> 
           <span class="subtitle">since visit</span>
-    
           <div class="result">
             <span id="censoredResult">
-    
               <span id="censoredCount">0</span> 
               &#40;<span id="censoredRatio">0</span>&percnt;&#41;
-    
             </span>
           </div>
-    
         </div>
   
         <!-- NEWSFEED CENSORED TWEETS -->
         <div>
           <span class="subtitle">on this feed</span>
-    
           <div class="result">
             <span id="feedCensoredResult">
-    
               <span id="feedCensoredCount">0</span> 
               &#40;<span id="feedCensoredRatio">0</span>&percnt;&#41;
-    
             </span>
           </div>
-
         </div>
 
       </div>
 
+      <!-- ICONS CONTAINER -->
       <div class="highlighted icons-container">
         <div>
-          <span class="title">I</span>
+          <span class="title"><a href="about_us.html"><img src="images/about-us.png" class="icons"></a></span>
         </div>
         <div>
           <span class="title">I</span>
@@ -63,8 +60,9 @@
         </div>
       </div>
 
+    </div>
     
-
     <script src="popup.js"></script>
+
   </body>
 </html>

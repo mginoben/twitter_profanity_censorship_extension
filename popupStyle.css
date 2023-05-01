@@ -1,3 +1,4 @@
+
 @font-face {
     font-family: simplysans;
     src: url(fonts/simplysans.ttf);
@@ -8,15 +9,11 @@
     src: url(fonts/alte.ttf);
 }
 
-html {
-    margin: 0px !important;
-    padding: 0px !important;
-}
-
 body {
+    margin: 0;
+    padding: 0;
     color: white;
     background-color:#1f1f1f;
-    margin: 0px;
     width: 150px;
     font-family: alte !important;
 }
@@ -45,7 +42,7 @@ body {
 }
 
 .title {
-    padding: 5px 2px;
+    /* padding: 5px 2px; */
     font-weight: 300;
     font-size: 15px;
 }
@@ -127,7 +124,6 @@ input:checked + .slider:before {
     transform: translateX(30px);
 }
 
-/* Rounded sliders */
 .slider.round {
     border-radius: 34px;
 }
@@ -138,4 +134,10 @@ input:checked + .slider:before {
 
 .icons-container {
     justify-content:space-around;
+    padding: 5px;
+}
+
+.icons {
+    width: 30px;
+    height: 30px;
 }
