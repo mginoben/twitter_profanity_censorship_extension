@@ -1,42 +1,4 @@
 // Predicts tweet
-async function query(tweet) {
-    try {
-        const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                data: [
-                    tweet,
-                ]
-            })
-        });
-
-        if (response.ok) {
-            const expectedResults = ["Abusive", "Non-Abusive", "No Profanity"];
-            const result = await response.json();
-            const prediction = result["data"][0]["label"];
-            
-            if (expectedResults.includes(prediction)) {
-                chrome.runtime.sendMessage({ status: "running" });
-                return prediction;
-            }
-            else {
-                chrome.runtime.sendMessage({ status: "loading" });
-            }
-
-        } else {
-            chrome.runtime.sendMessage({ status: "loading" });
-            console.log("Loading model please wait...");
-            // console.log(`HTTP Response Code:`, response.status);
-        }
-    } catch (error) {
-        chrome.runtime.sendMessage({ status: "loading" });
-        console.log("Loading model please wait...");
-    }
-        
-}
-
-
 function censor(tweetDiv) {
 
     tweetDiv.classList.add("censored");
@@ -85,7 +47,7 @@ function addReportButton(tweetDiv) {
             img.src = chrome.runtime.getURL("images/report.png");
             img.alt = 'Mark as wrong censorship';
             img.classList.add("report-img");
-            parent = tweetDiv.parentNode.parentNode;
+            parent = tweetDiv.parentNode;
 
             // Append button as tweet siblings
             tweetDiv.insertAdjacentElement('afterend', img);
@@ -113,49 +75,32 @@ function addReportButton(tweetDiv) {
 }
 
 
-function hideTweetDivs(tweetDivs) {
-    
-    // Loop through tweet divs
+function hideTweets() {
+
+    const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+    const overlayDiv = document.createElement('div');
+    overlayDiv.style.backgroundColor = bodyColor;
+    overlayDiv.classList.add('overlay');
+
+    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+
     for (const tweetDiv of tweetDivs) {
 
-        if (tweetDiv.classList.contains("done")) {
+        if (tweetDiv.getAttribute("lang") === "en") {
             continue;
         }
-
-        // Append overlay to div
-        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-        const overlayDiv = document.createElement('div');
-        overlayDiv.style.backgroundColor = bodyColor;
-        overlayDiv.classList.add('overlay');
-        tweetDiv.parentNode.appendChild(overlayDiv);
         
-        let count = 0;
+        if (tweetDiv.classList.contains("predicted") && tweetDiv.lastChild.classList.contains("overlay")) {
 
-        const intervalID = setInterval(function() {
+            tweetDiv.removeChild(tweetDiv.lastChild);
 
-            // Get save tweets from background (tweetPredictions)
-            chrome.runtime.sendMessage({action: "get_tweets"}, function(response) { 
-                
-                const tweetPredictions = response.tweetPredictions;
-                const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-                const foundTweet = findTweet(tweetPredictions, tweet);
+        }
+        else if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains("overlay")) {
 
-                // Found ? Remove appended div
-                if (foundTweet && tweetDiv.parentNode.lastChild.classList.contains("overlay")) {
-                    clearInterval(intervalID);
-                    tweetDiv.parentNode.removeChild(overlayDiv);
-                }
-                // interval count elapse? Remove appended div
-                else if (count === 20) {
-                    clearInterval(intervalID);
-                    tweetDiv.parentNode.removeChild(overlayDiv);
-                }
-        
-                count++;
+            tweetDiv.appendChild(overlayDiv);
+       
+        } 
 
-            });
-
-        }, 200);  
     }
 
 }
@@ -172,97 +117,155 @@ function findTweet(listOfTweet, tweet) {
   
 }
 
-// Loop interval
-setInterval(function() {
+// Connect to the background script
 
-    // Get all div containing tweets
-    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+var port = chrome.runtime.connect({name: 'content'});
 
-    if (tweetDivs.length > 0) {
 
-        hideTweetDivs(tweetDivs); 
+// Listen for messages from the background script
+port.onMessage.addListener((message) => {
+
+    // console.log('Received message from background script:', message);
+
+    if (message.tweetPredictions) {
         
+        const tweetPredictions = message.tweetPredictions;
+        const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+
         for (const tweetDiv of tweetDivs) {
 
-            if (tweetDiv.classList.contains("done")) {
-                continue;
-            }
+            if (tweetDiv.classList.contains("predicted")) { continue; }
 
-            // Get save tweets from background (tweetPredictions)
-            chrome.runtime.sendMessage({action: "get_tweets"}, function(response) {
-                
-                const tweetPredictions = response.tweetPredictions;
-                const language = tweetDiv.getAttribute("lang");
-                const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            const foundTweet = findTweet(tweetPredictions, tweet);
 
-                // Find current tweet from saved tweets
-                const foundTweet = findTweet(tweetPredictions, tweet);
-                
-                // Not found? Predict
-                if (!foundTweet) {
+            if (foundTweet) {
 
-                    query(tweet).then(prediction => {
-
-                        console.log("Predicting...");
-
-                        // Error or Loading
-                        if (!prediction) {
-                            return;
-                        }
-
-                        chrome.runtime.sendMessage({ status: "running" });
-
-                        // Censor if Abusive
-                        if (prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
-                            console.log("Censoring...", tweet);
-                            censor(tweetDiv);
-                            tweetDiv.classList.add("censored");
-                        }
-
-                        if (language === "en") {
-                            prediction = "Not Tagalog";
-                        }
-                        
-                        // Push to saved tweets
-                        chrome.runtime.sendMessage({ 
-                            action: "save_tweet",
-                            tweet: tweet,
-                            prediction: prediction
-                        });
-
-                        console.log("Tweet:", tweet, "\nPrediction:", prediction);
-
-                    });
+                if (foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
+                    censor(tweetDiv);
                 }
-                // Found? Add to feed tweet. Abusive? Censor
-                else if (foundTweet) {
-
-                    if (foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
-                        console.log("Censoring...", tweet);
-                        censor(tweetDiv);
-                        tweetDiv.classList.add("censored");
-                    }
-
-                    console.log("Feed tweet added:", foundTweet);
-                    chrome.runtime.sendMessage({ 
-                        action: "save_feed_tweet",
-                        tweet: foundTweet.tweet,
-                        prediction: foundTweet.prediction
-                    });
-
-                    chrome.runtime.sendMessage({ status: "running" });
-
-                }                            
-
+                
                 addReportButton(tweetDiv);
 
-                tweetDiv.classList.add("done");
-
-            });
-        
+                tweetDiv.classList.add("predicted");
+            }
         }
 
     }
+  
+});
+
+// Loop interval
+setInterval(function() {
+
+    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+    
+    if (tweetDivs.length > 0) {
+
+        hideTweets();
+
+        let tweets = [];
+
+        for (const tweetDiv of tweetDivs) {
+
+            const language = tweetDiv.getAttribute("lang");
+
+            if (language === "en" && !tweetDiv.classList.contains("predicted")) {
+                tweetDiv.classList.add("predicted");
+                continue;
+            }
+
+            if (tweetDiv.classList.contains("predicted")) { continue; }
+
+            const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            tweets.push(tweet);
+
+        }
+       
+        if (port) {
+            port.postMessage({ tweets : tweets });
+        }
+    }
+    
+
+    // const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+
+    // if (tweetDivs.length > 0) {
+
+    //     hideTweetDivs(tweetDivs); 
+        
+    //     for (const tweetDiv of tweetDivs) {
+
+    //         if (tweetDiv.classList.contains("done")) {
+    //             continue;
+    //         }
+
+    //         port.postMessage({ action : "get_tweets" });
+
+    //         chrome.runtime.sendMessage({action: "get_tweets"}, function(response) {
+                
+    //             const tweetPredictions = response.tweetPredictions;
+    //             const language = tweetDiv.getAttribute("lang");
+    //             const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+    //             const foundTweet = findTweet(tweetPredictions, tweet);
+                
+    //             // If not found then predict and save
+    //             // if (!foundTweet) {
+
+    //             //     query(tweet).then(prediction => {
+
+    //             //         console.log("Predicting...");
+
+    //             //         if (!prediction) {
+    //             //             return;
+    //             //         }
+
+    //             //         if (prediction == "Abusive" && !tweetDiv.classList.contains("censored")) {
+    //             //             console.log("Censoring...", tweet);
+    //             //             censor(tweetDiv);
+    //             //             tweetDiv.classList.add("censored");
+    //             //         }
+
+    //             //         if (language === "en") {
+    //             //             prediction = "Not Tagalog";
+    //             //         }
+
+    //             //         chrome.runtime.sendMessage({ 
+    //             //             action: "save_tweet",
+    //             //             tweet: tweet,
+    //             //             prediction: prediction
+    //             //         });
+
+    //             //         console.log("Tweet:", tweet, "\nPrediction:", prediction);
+
+    //             //     });
+    //             // }
+    //             // else {
+    //             //     chrome.runtime.sendMessage({ status: "running" });
+                    
+    //             //     chrome.runtime.sendMessage({ 
+    //             //         action: "save_feed_tweet",
+    //             //         tweet: foundTweet.tweet,
+    //             //         prediction: foundTweet.prediction
+    //             //     });
+    //             // }
+
+    //             // If tweet in saved and abusive
+    //             if (foundTweet && foundTweet.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
+    //                 console.log("Censoring...", tweet);
+    //                 censor(tweetDiv);
+    //                 tweetDiv.classList.add("censored");
+    //             }
+
+    //             addReportButton(tweetDiv);
+
+    //             tweetDiv.classList.add("done");
+
+    //         });
+        
+    //     }
+
+    // }
         
 }, 800);
 

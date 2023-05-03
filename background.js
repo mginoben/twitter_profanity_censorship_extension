@@ -61,6 +61,50 @@ function sendMessage(message) {
   });
 }
 
+async function query(tweet) {
+    try {
+        const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                data: [
+                    tweet,
+                ]
+            })
+        });
+
+        if (response.ok) {
+            const expectedResults = ["Abusive", "Non-Abusive", "No Profanity"];
+            const result = await response.json();
+            const prediction = result["data"][0]["label"];
+            
+            if (expectedResults.includes(prediction)) {
+                return prediction;
+            }
+
+        } else {
+            console.log("Loading model please wait...");
+            // console.log(`HTTP Response Code:`, response.status);
+        }
+    } catch (error) {
+		console.log("Query error:", error);
+    }
+        
+}
+
+function updatePopup(port) {
+	port.postMessage({ 
+		popup: "update",
+		tweetCount: tweetPredictions.length,
+		censoredCount: countAbusive(tweetPredictions), 
+		censoredRatio: computeCensoredRatio(tweetPredictions),
+		feedTweetCount: feedTweetPredictions.length,
+		feedCensoredCount: countAbusive(feedTweetPredictions),
+		feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
+		toggleState: toggleState
+	});
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 	if (message.popup === "update") {
@@ -110,7 +154,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	}
 
 	if (message.action === "get_tweets") {
-		console.log("Getting tweets ... no. of tweets:", tweetPredictions.length);
 		sendResponse({ tweetPredictions: tweetPredictions });
 	}
 
@@ -185,16 +228,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 			// Inject script and css if toggle state = true
 			if (toggle.toggleState === true) {
-
-				console.log("Injecting script...");
 				chrome.scripting.insertCSS({
 					target: { tabId: tabId },
 					files: ["style.css"]
-				});
+				}).then(() => console.log("injected css file"));
+        
 				chrome.scripting.executeScript({
 					target: { tabId: tabId },
 					files: ["content.js"]
-				});
+				}).then(() => console.log("injected script file"));
 
 				chrome.action.setIcon({ path: "images/censored-128x128.png" });
 			}
@@ -211,6 +253,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 
 chrome.runtime.onConnect.addListener(function(port) {
+
+	console.log(port);
 	
 	if (port.name === "popup") {
 		console.log("Popup script connected");
@@ -246,9 +290,6 @@ chrome.runtime.onConnect.addListener(function(port) {
 			popupPort.postMessage(toggleState);
 			console.log("Toggle state sent.");
 		});
-
-	  	
-
 
 	  	// Listen for messages from the popup script
 	  	popupPort.onMessage.addListener(function(message) {
@@ -301,6 +342,60 @@ chrome.runtime.onConnect.addListener(function(port) {
 			popupPort = null;
 	  });
 
+	}
+
+	if (port.name === "content") {
+		console.log("Content script connected");
+		// Save the port for later use
+		let contentPort = port;
+
+		// Listen for messages from the popup script
+		contentPort.onMessage.addListener(function(message) {
+
+			// console.log("Received message from content script:", message);
+
+			if (message.tweets) {
+
+				const tweets = message.tweets;
+
+				for (let i = 0; i < tweets.length; i++) {
+
+					const tweet = tweets[i];
+					const foundTweet = findTweet(tweetPredictions, tweet);
+
+					if (!foundTweet) {
+						query(tweet).then(prediction => {
+
+							console.log("Predicting...");
+			
+							if (!prediction) {
+								return;
+							}
+							
+							if (!findTweet(tweetPredictions, tweet)) {
+								tweetPredictions.push({ tweet: tweet, prediction: prediction });
+								console.log("Tweet:", tweet, "\nPrediction:", prediction);
+							}
+
+						});
+					}
+					else if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
+						feedTweetPredictions.push({tweet: foundTweet.tweet, prediction: foundTweet.prediction});
+					}
+					
+				}
+
+				contentPort.postMessage({tweetPredictions : tweetPredictions});
+
+			}
+
+		});
+
+		// Handle disconnections
+		contentPort.onDisconnect.addListener(function() {
+			console.log("Content script disconnected");
+			contentPort = null;
+		});
 	}
   });
   
