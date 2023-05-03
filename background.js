@@ -107,56 +107,6 @@ function updatePopup(port) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
-	if (message.popup === "update") {
-	
-		sendResponse({ 
-			tweetCount: tweetPredictions.length,
-			censoredCount: countAbusive(tweetPredictions), 
-			censoredRatio: computeCensoredRatio(tweetPredictions),
-			feedTweetCount: feedTweetPredictions.length,
-			feedCensoredCount: countAbusive(feedTweetPredictions),
-			feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
-			toggleState: toggleState
-		});
-		
-	}
-
-	if (message.action == "save_tweet") {
-
-		if (!findTweet(tweetPredictions, message.tweet)) {
-			tweetPredictions.push({tweet: message.tweet, prediction: message.prediction});
-			console.log("Saved tweet:", message.tweet, "\nPrediction:", message.prediction);
-			
-			if (countAbusive(tweetPredictions) > 0) {
-				chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
-				chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
-				chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
-			}
-			else {
-				chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
-			}
-		}
-
-		if (!findTweet(feedTweetPredictions, message.tweet)) {
-			console.log("Adding to feed:", message.tweet);
-			feedTweetPredictions.push({tweet: message.tweet, prediction: message.prediction});
-		}
-		
-	}
-
-	if (message.action === "save_feed_tweet") {
-
-		if (!findTweet(feedTweetPredictions, message.tweet)) {
-			console.log("Adding to feed:", message.tweet);
-			feedTweetPredictions.push({tweet: message.tweet, prediction: message.prediction});
-		}
-
-	}
-
-	if (message.action === "get_tweets") {
-		sendResponse({ tweetPredictions: tweetPredictions });
-	}
-
 	if (message.action === "get_reported") {
 		sendResponse({ reportedTweets: reportedTweets });
 	}
@@ -249,8 +199,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
 
 });
-
-
 
 chrome.runtime.onConnect.addListener(function(port) {
 
@@ -363,29 +311,34 @@ chrome.runtime.onConnect.addListener(function(port) {
 					const tweet = tweets[i];
 					const foundTweet = findTweet(tweetPredictions, tweet);
 
-					if (!foundTweet) {
-						query(tweet).then(prediction => {
-
-							console.log("Predicting...");
-			
-							if (!prediction) {
-								return;
-							}
-							
-							if (!findTweet(tweetPredictions, tweet)) {
-								tweetPredictions.push({ tweet: tweet, prediction: prediction });
-								console.log("Tweet:", tweet, "\nPrediction:", prediction);
-							}
-
-						});
+					if (foundTweet) {
+						
+						contentPort.postMessage({ action: "predict", tweet: foundTweet.tweet, prediction: foundTweet.prediction })
+						
+						if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
+							feedTweetPredictions.push({tweet: foundTweet.tweet, prediction: foundTweet.prediction});
+						}
+						
+						continue;
 					}
-					else if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
-						feedTweetPredictions.push({tweet: foundTweet.tweet, prediction: foundTweet.prediction});
-					}
+
+
+					query(tweet).then(prediction => {
+
+						console.log("Predicting...");
+		
+						if (!prediction) {
+							return;
+						}
+						
+						if (!findTweet(tweetPredictions, tweet)) {
+							tweetPredictions.push({ tweet: tweet, prediction: prediction });
+							console.log("Tweet:", tweet, "\nPrediction:", prediction);
+						}
+
+					});
 					
 				}
-
-				contentPort.postMessage({tweetPredictions : tweetPredictions});
 
 			}
 
