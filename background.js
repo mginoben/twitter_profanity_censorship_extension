@@ -315,38 +315,52 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			// console.log("Received message from content script:", message);
 
+			// Content script sends tweet
 			if (message.tweet) {
 
+				// Check if already in predicted list
 				const foundTweet = findTweet(tweetPredictions, message.tweet);
-
+	
+				// If not found or pending -> predict
 				if (!foundTweet) {
 
-					console.log("Predicting:", message.tweet);
-
-					query(message.tweet).then(prediction => {
+					query(message.tweet.toLowerCase()).then(prediction => {
 		
+						// Predict error? -> send back to content script as pending
 						if (!prediction) {
+							console.log("Prediction error! Sending back to content script:", message.tweet);
+							contentPort.postMessage({ 
+								tweet: message.tweet, 
+								prediction: "Pending" 
+							});
 							return;
 						}
-						
+
+						// Send back to content with predictions
 						contentPort.postMessage({ 
 							tweet : message.tweet,
 							prediction: prediction
 						});
 
+						// Add to predicted list
 						tweetPredictions.push({ 
 							tweet: message.tweet, 
 							prediction: prediction 
 						});
 
+						// Add to current feed list
 						feedTweetPredictions.push({ 
 							tweet: message.tweet, 
 							prediction: prediction 
 						});
 
+						console.log("Tweet:", message.tweet, "\nResult:", prediction);
+
 					});
 
+
 				}
+				// Tweet already predicted? -> censor if abusive, push to current feed list
 				else {
 
 					console.log("Sending...", foundTweet.tweet);
@@ -355,10 +369,10 @@ chrome.runtime.onConnect.addListener(function(port) {
 						prediction: foundTweet.prediction
 					});
 
-					if (!findTweet(feedTweetPredictions, tweet)) {
+					if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
 						feedTweetPredictions.push({
-							tweet: tweet, 
-							prediction: prediction
+							tweet: foundTweet.tweet, 
+							prediction: foundTweet.prediction
 						});
 					}
 

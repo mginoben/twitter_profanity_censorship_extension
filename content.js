@@ -32,6 +32,25 @@ function censor(tweetDiv) {
 
 }
 
+function showReportToast(message) {
+
+    const toast = document.createElement('div');
+    toast.id = "toast";
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    // Get the snackbar DIV
+    var x = document.getElementById("toast");
+
+    // Add the "show" class to DIV
+    x.classList.add("show");
+
+    // After 3 seconds, remove the show class from DIV
+    setTimeout(function(){
+        x.className = x.className.replace("show", ""); 
+        document.body.removeChild(x);
+    }, 3000);
+
+}
 
 function addReportButton(tweetDiv) {
     // Get reported tweets from background (reportedTweets)
@@ -51,7 +70,7 @@ function addReportButton(tweetDiv) {
 
             // Append button as tweet siblings
             tweetDiv.insertAdjacentElement('afterend', img);
-
+            
             // Show button on tweet div hover
             parent.addEventListener("mouseover", () => {
                 img.style.display = "block";
@@ -64,10 +83,21 @@ function addReportButton(tweetDiv) {
             // Button listener
             img.addEventListener('click', (event) => {
                 event.stopPropagation();
-                alert("Tweet reported successfully.\nThank you for your feedback");
                 tweetDiv.parentNode.removeChild(img);
-                console.log("Reported...", tweet);
-                chrome.runtime.sendMessage({action: "report", tweet: tweet});
+                
+                
+                // Expected result
+                if (tweetDiv.classList.contains("censored")) {
+                    chrome.runtime.sendMessage({ action: "report", tweet: tweet, expected : "uncesored" });
+                    showReportToast("Tweet Reported: Should not be censored.");
+                }
+                else {
+                    chrome.runtime.sendMessage({ action: "report", tweet: tweet, expected : "censored" });
+                    showReportToast("Tweet Reported: Should be censored.");
+                }
+                
+                
+                
             });
         }
 
@@ -75,27 +105,35 @@ function addReportButton(tweetDiv) {
 }
 
 
-function hideTweet(tweetDiv) {
+function hideTweets() {
 
-    const language = tweetDiv.getAttribute("lang");
+    setInterval(function() {
 
-    if (language === "en") {
-        return;
-    }
+        const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
 
+        for (const tweetDiv of tweetDivs) {
 
-    if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains("overlay")) {
-        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-        const overlayDiv = document.createElement('div');
-        overlayDiv.style.backgroundColor = bodyColor;
-        overlayDiv.classList.add('overlay');
-        tweetDiv.appendChild(overlayDiv);
-    }
+            const language = tweetDiv.getAttribute("lang");
+    
+            if (language === "en") {
+                return;
+            }
+        
+            if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains("overlay")) {
+                const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+                const overlayDiv = document.createElement('div');
+                overlayDiv.style.backgroundColor = bodyColor;
+                overlayDiv.classList.add('overlay');
+                tweetDiv.appendChild(overlayDiv);
+            }
+        }
+
+    }, 400);
 
 }
 
 function showTweet(tweetDiv) {
-    if (tweetDiv.lastChild.classList.contains("overlay")) {
+    if (tweetDiv.lastChild.classList.contains("overlay") || tweetDiv.querySelector(".overlay")) {
         tweetDiv.removeChild(tweetDiv.lastChild);
     }
 }
@@ -137,7 +175,6 @@ function findTweetDiv(targetTweet) {
 
 var port = chrome.runtime.connect({name: 'content'});
 
-
 // Listen for messages from the background script
 port.onMessage.addListener((message) => {
 
@@ -145,33 +182,37 @@ port.onMessage.addListener((message) => {
 
     if (message.tweet) {
 
-        const textContent = message.tweet;
-
         const tweetDivs = [...document.querySelectorAll('[data-testid="tweet"] [lang]')]
-        .filter(div => div.textContent.includes(textContent));
+        .filter(div => div.textContent.includes(message.tweet));
 
-        tweetDivs.forEach(tweetDiv => {
+        for (let i = 0; i < tweetDivs.length; i++) {
+            const tweetDiv = tweetDivs[i];
 
             if (!tweetDiv) {
-                return;
+                continue;
             }
 
-            showTweet(tweetDiv);
-    
+            // Pending tweet? -> send again to background script
+            if (message.prediction === "Pending" && tweetDiv.classList.contains("sent")) {
+                tweetDiv.classList.remove("sent");
+                continue;
+            }
+
+            // Abusive tweet? -> censor
             if (message.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
                 censor(tweetDiv);
             }
     
             tweetDiv.classList.add("predicted");
-    
             console.log(message.tweet, message.prediction);
-
-        });
+            
+        }
 
     }
-  
+
 });
 
+hideTweets();
 
 // Loop interval
 setInterval(function() {
@@ -180,27 +221,29 @@ setInterval(function() {
     
     if (tweetDivs.length > 0) {
         
-        tweetDivs.forEach(tweetDiv => {
+        for (let i = 0; i < tweetDivs.length; i++) {
 
-            hideTweet(tweetDiv);
-
-            const language = tweetDiv.getAttribute("lang");
-            // const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            const tweetDiv = tweetDivs[i];
             const tweet = tweetDiv.textContent;
-
-
-            if (!tweetDiv.classList.contains("sent") && language !== "en" && !tweetDiv.classList.contains("predicted")) {
-                port.postMessage({ tweet : tweet });
+            const language = tweetDiv.getAttribute("lang");
+ 
+            if (tweetDiv.classList.contains("sent") || language === "en") {
+                if (tweetDiv.classList.contains("predicted")) {
+                    showTweet(tweetDiv);
+                }
+                continue;
             }
 
-            addReportButton(tweetDiv);
+            port.postMessage({ tweet : tweet });
 
+            addReportButton(tweetDiv);
             tweetDiv.classList.add("sent");
-        });
+
+        }
 
     }
         
-}, 800);
+}, 1000);
 
 
 
