@@ -1,6 +1,6 @@
 {
-  "name": "Twitter Profanity",
-  "description": "Censors tweets that contains abusive profanity based on context.",
+  "name": "Cuss Control",
+  "description": "A context-based tagalog profanity moderation for Twitter.",
   "version": "1.0",
   "manifest_version": 3,
   "action": {

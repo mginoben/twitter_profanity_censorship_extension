@@ -105,6 +105,27 @@ function updatePopup(port) {
 	});
 }
 
+function addToFeed(tweet, prediction) {
+	if (!findTweet(feedTweetPredictions, tweet)) {
+		feedTweetPredictions.push({
+			tweet: tweet, 
+			prediction: prediction
+		});
+	}
+}
+
+// function updateBadge() {
+// 	// Set badge behaviour
+// 	if (countAbusive(tweetPredictions) > 0) {
+// 		chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
+// 		chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
+// 		chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
+// 	}
+// 	else {
+// 		chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
+// 	}
+// }
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 	if (message.action === "get_reported") {
@@ -131,15 +152,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 		// Set popup
 		chrome.action.setPopup({popup: "popup.html"});
 
-		// Set badge behaviour
-		if (countAbusive(tweetPredictions) > 0) {
-		chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
-		chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
-		chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
-		}
-		else {
-		chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
-		}
+
 		
 	}
 
@@ -302,42 +315,53 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			// console.log("Received message from content script:", message);
 
-			if (message.tweets) {
+			if (message.tweet) {
 
-				const tweets = message.tweets;
+				const foundTweet = findTweet(tweetPredictions, message.tweet);
 
-				for (let i = 0; i < tweets.length; i++) {
+				if (!foundTweet) {
 
-					const tweet = tweets[i];
-					const foundTweet = findTweet(tweetPredictions, tweet);
+					console.log("Predicting:", message.tweet);
 
-					if (foundTweet) {
-						
-						contentPort.postMessage({ action: "predict", tweet: foundTweet.tweet, prediction: foundTweet.prediction })
-						
-						if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
-							feedTweetPredictions.push({tweet: foundTweet.tweet, prediction: foundTweet.prediction});
-						}
-						
-						continue;
-					}
-
-
-					query(tweet).then(prediction => {
-
-						console.log("Predicting...");
+					query(message.tweet).then(prediction => {
 		
 						if (!prediction) {
 							return;
 						}
 						
-						if (!findTweet(tweetPredictions, tweet)) {
-							tweetPredictions.push({ tweet: tweet, prediction: prediction });
-							console.log("Tweet:", tweet, "\nPrediction:", prediction);
-						}
+						contentPort.postMessage({ 
+							tweet : message.tweet,
+							prediction: prediction
+						});
+
+						tweetPredictions.push({ 
+							tweet: message.tweet, 
+							prediction: prediction 
+						});
+
+						feedTweetPredictions.push({ 
+							tweet: message.tweet, 
+							prediction: prediction 
+						});
 
 					});
-					
+
+				}
+				else {
+
+					console.log("Sending...", foundTweet.tweet);
+					contentPort.postMessage({ 
+						tweet : foundTweet.tweet,
+						prediction: foundTweet.prediction
+					});
+
+					if (!findTweet(feedTweetPredictions, tweet)) {
+						feedTweetPredictions.push({
+							tweet: tweet, 
+							prediction: prediction
+						});
+					}
+
 				}
 
 			}

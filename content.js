@@ -75,34 +75,31 @@ function addReportButton(tweetDiv) {
 }
 
 
-function hideTweets(tweetDivs) {
+function hideTweet(tweetDiv) {
 
-    const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
-    const overlayDiv = document.createElement('div');
-    overlayDiv.style.backgroundColor = bodyColor;
-    overlayDiv.classList.add('overlay');
+    const language = tweetDiv.getAttribute("lang");
 
-    for (const tweetDiv of tweetDivs) {
+    if (language === "en") {
+        return;
+    }
 
-        if (tweetDiv.getAttribute("lang") === "en") {
-            continue;
-        }
-        
-        if (tweetDiv.classList.contains("predicted") && tweetDiv.lastChild.classList.contains("overlay")) {
 
-            tweetDiv.removeChild(tweetDiv.lastChild);
-
-            continue;
-
-        }
-
+    if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains("overlay")) {
+        const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+        const overlayDiv = document.createElement('div');
+        overlayDiv.style.backgroundColor = bodyColor;
+        overlayDiv.classList.add('overlay');
         tweetDiv.appendChild(overlayDiv);
-
     }
 
 }
 
-// TOOOOOOOOOOOODDDDDDDDDDDDDDOOOOOOOOOOOOOOOOOOOOOOO hide tweets
+function showTweet(tweetDiv) {
+    if (tweetDiv.lastChild.classList.contains("overlay")) {
+        tweetDiv.removeChild(tweetDiv.lastChild);
+    }
+}
+
 
 function findTweet(listOfTweet, tweet) {
 
@@ -136,7 +133,6 @@ function findTweetDiv(targetTweet) {
     }
 }
 
-
 // Connect to the background script
 
 var port = chrome.runtime.connect({name: 'content'});
@@ -147,25 +143,34 @@ port.onMessage.addListener((message) => {
 
     // console.log('Received message from background script:', message);
 
-    if (message.action === "predict") {
+    if (message.tweet) {
 
-        var tweetDiv = findTweetDiv(message.tweet);
+        const textContent = message.tweet;
 
-        if (tweetDiv) {
+        const tweetDivs = [...document.querySelectorAll('[data-testid="tweet"] [lang]')]
+        .filter(div => div.textContent.includes(textContent));
 
-            if (message.prediction === "Abusive" && !tweetDiv.classList.contains("predicted")) {
+        tweetDivs.forEach(tweetDiv => {
+
+            if (!tweetDiv) {
+                return;
+            }
+
+            showTweet(tweetDiv);
+    
+            if (message.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
                 censor(tweetDiv);
             }
     
             tweetDiv.classList.add("predicted");
-        }
+    
+            console.log(message.tweet, message.prediction);
+
+        });
 
     }
   
 });
-
-
-var tweets = [];
 
 
 // Loop interval
@@ -174,33 +179,28 @@ setInterval(function() {
     const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
     
     if (tweetDivs.length > 0) {
+        
+        tweetDivs.forEach(tweetDiv => {
 
-        hideTweets(tweetDivs);
-
-        for (const tweetDiv of tweetDivs) {
+            hideTweet(tweetDiv);
 
             const language = tweetDiv.getAttribute("lang");
+            // const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            const tweet = tweetDiv.textContent;
 
-            if (language === "en" || tweetDiv.classList.contains("predicted")) {
-                continue;
+
+            if (!tweetDiv.classList.contains("sent") && language !== "en" && !tweetDiv.classList.contains("predicted")) {
+                port.postMessage({ tweet : tweet });
             }
 
-            const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+            addReportButton(tweetDiv);
 
-            if (!tweets.includes(tweet)) {
-                tweets.push(tweet);
-            }
-            
-
-        }
-       
-        if (port) {
-            port.postMessage({ tweets : tweets });
-        }
+            tweetDiv.classList.add("sent");
+        });
 
     }
         
-}, 600);
+}, 800);
 
 
 
