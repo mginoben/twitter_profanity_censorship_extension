@@ -2,63 +2,67 @@
 <html>
   <head>
     <title>My Extension</title>
-    <link rel="stylesheet" href="popupStyle.css">
+    <link rel="stylesheet" href="styles/popup.css">
   </head>
   <body>
 
     <div class="container">
 
-      <!-- EXTENSION SWITCH -->
-      <div>
-        <label class="switch">
-          <input type="checkbox" id="censorToggle">
-          <span class="slider round"></span>
-        </label>
-      </div>
+      <div id="main-window">
 
-      
-      <div class="highlighted">
+        <!-- EXTENSION SWITCH -->
+        <div>
+          <label class="switch">
+            <input type="checkbox" id="censorToggle">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
         <span class="title">Censored Tweets</span>
-      </div>
 
-      <div id="censoredContent">
+        <div id="censoredContent">
 
-        <!-- ALL CENSORED TWEETS -->
-        <div> 
-          <span class="subtitle">since visit</span>
-          <div class="result">
-            <span id="censoredResult">
+          <!-- ALL CENSORED TWEETS -->
+          <div> 
+            <span class="subtitle">since visit</span>
+            <span id="censoredResult" class="result">
               <span id="censoredCount">0</span> 
-              &#40;<span id="censoredRatio">0</span>&percnt;&#41;
+              &nbsp;&#40;<span id="censoredRatio">0</span>&percnt;&#41;
             </span>
           </div>
-        </div>
-  
-        <!-- NEWSFEED CENSORED TWEETS -->
-        <div>
-          <span class="subtitle">on this feed</span>
-          <div class="result">
-            <span id="feedCensoredResult">
+    
+          <!-- NEWSFEED CENSORED TWEETS -->
+          <div>
+            <span class="subtitle">on this feed</span>
+            <span id="feedCensoredResult" class="result">
               <span id="feedCensoredCount">0</span> 
-              &#40;<span id="feedCensoredRatio">0</span>&percnt;&#41;
+              &nbsp;&#40;<span id="feedCensoredRatio">0</span>&percnt;&#41;
             </span>
+          </div>
+
+        </div>
+
+        <!-- ICONS CONTAINER -->
+        <div class="icons-container">
+          <div>
+            <a href="about.html"><img src="images/about.png" class="icon"></a>
+          </div>
+          <div>
+            <a id="toggle-log"><img src="images/log.png" class="icon"></a>
+          </div>
+          <div>
+            <input type="checkbox" name="" id="" class="icon">
           </div>
         </div>
 
       </div>
 
-      <!-- ICONS CONTAINER -->
-      <div class="highlighted icons-container">
-        <div>
-          <span class="title"><a href="about_us.html"><img src="images/about-us.png" class="icons"></a></span>
-        </div>
-        <div>
-          <span class="title">I</span>
-        </div>
-        <div>
-          <span class="title">I</span>
-        </div>
+      <div id="log-window" class="hidden">
+        <span class="title log-title">Tweet Predictions Log</span>
+        <div id="log-panel"></div>
+        
       </div>
+      
 
     </div>
     

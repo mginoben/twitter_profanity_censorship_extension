@@ -72,7 +72,9 @@ body.loading {
   color: #174f5c;
   background-color:gainsboro;
   border-radius: 4px;
-  /* padding: 5px; */
+  display: flex;
+  padding-top: 5%;
+  justify-content: center;
   position: fixed;
   top:0;
   right: 0;
@@ -115,8 +117,6 @@ body.loading {
   /* position: fixed; */
   /* top: 0; */
   /* left: 0; */
-  margin-left: 15%;
-  margin-top: 3%;
   border: 4px solid #f3f3f3; /* Light grey */
   border-top: 4px solid #FACF4A; /* Blue */
   border-radius: 50%;

@@ -13,6 +13,25 @@ port.onMessage.addListener((message) => {
     if (message.popup) {
         updatePopup(message);
     }
+
+    if (message.tweetPredictions) {
+
+        logPanel.innerHTML = '';
+
+        message.tweetPredictions.forEach(tweet => {
+            console.log(message.tweet);
+            const tweetLog = document.createElement('div');
+            tweetLog.textContent = tweet.tweet;
+            tweetLog.classList.add("tweet-log");
+            if (tweet.prediction === "Abusive") {
+                tweetLog.style.backgroundColor = "#ff8a90";
+            } else {
+                tweetLog.style.backgroundColor = "#b4e092";
+            }
+            logPanel.appendChild(tweetLog);
+        });
+        
+    }
   
 });
 
@@ -23,6 +42,21 @@ var feedCensoredRatio = document.getElementById("feedCensoredRatio");
 var censoredResult = document.getElementById("censoredResult");
 var feedCensoredResult = document.getElementById("feedCensoredResult");
 var censorToggle = document.getElementById("censorToggle");
+var logPanel = document.getElementById("log-panel");
+var logWindow = document.getElementById("log-window");
+var toggleLog = document.getElementById("toggle-log");
+
+toggleLog.addEventListener("click", function() {
+
+    if (logWindow.classList.contains("hidden")) {
+        logWindow.classList.remove("hidden");
+    }
+    else {
+        logWindow.classList.add("hidden");
+    }
+    
+  
+});
 
 
 censorToggle.addEventListener("change", function() {
@@ -46,11 +80,7 @@ function updatePopup(message) {
     censoredRatio.textContent = message.censoredRatio;
     censoredCount.textContent = message.censoredCount;
 
-    if (message.tweetCount == 1) {
-        censoredResult.innerText = 1;
-        censoredResult.style.color = "#b4e092";
-    }
-    else if (message.censoredRatio >= 50 && message.tweetCount >= 10) {
+    if (message.censoredRatio >= 50 && message.tweetCount >= 10) {
         censoredResult.style.color = "#ff8a90";
     }
     else if (message.tweetCount == 0 && message.censoredCount == 0) {
@@ -61,11 +91,8 @@ function updatePopup(message) {
         censoredResult.style.color = "#b4e092";
     }
 
-    if (message.tweetCount == 1) {
-        feedCensoredResult.innerText = 1;
-        feedCensoredResult.style.color = "#b4e092";
-    }
-    else if (message.feedCensoredRatio >= 50 && message.feedTweetCount >= 10) {
+
+    if (message.feedCensoredRatio >= 50 && message.feedTweetCount >= 10) {
         feedCensoredResult.style.color = "#ff8a90";
     }
     else if (message.feedTweetCount == 0 && message.feedCensoredCount == 0) {

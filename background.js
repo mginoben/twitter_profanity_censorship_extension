@@ -201,7 +201,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 			if (toggle.toggleState === true) {
 				chrome.scripting.insertCSS({
 					target: { tabId: tabId },
-					files: ["style.css"]
+					files: ["styles/content.css"]
 				}).then(() => console.log("injected css file"));
         
 				chrome.scripting.executeScript({
@@ -221,6 +221,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 });
 
+
+let popupPort;
+let contentPort;
+
 chrome.runtime.onConnect.addListener(function(port) {
 
 	console.log(port);
@@ -228,7 +232,8 @@ chrome.runtime.onConnect.addListener(function(port) {
 	if (port.name === "popup") {
 		console.log("Popup script connected");
 		// Save the port for later use
-		let popupPort = port;
+		popupPort = port;
+		let tweetsLength = 0;
 		let intervalID;
 
 		// Send toggle state to popup script
@@ -240,6 +245,13 @@ chrome.runtime.onConnect.addListener(function(port) {
 			if (popupPort && toggleState.toggleState === true) {
 				intervalID = setInterval(function() {
 					console.log("Updating popup...");
+
+					if (popupPort && tweetsLength != tweetPredictions.length) {
+						popupPort.postMessage({
+							tweetPredictions: tweetPredictions
+						})
+						tweetsLength = tweetPredictions.length;
+					}
 					
 					popupPort.postMessage({ 
 						popup: "update",
@@ -316,7 +328,7 @@ chrome.runtime.onConnect.addListener(function(port) {
 	if (port.name === "content") {
 		console.log("Content script connected");
 		// Save the port for later use
-		let contentPort = port;
+		contentPort = port;
 
 		// Listen for messages from the popup script
 		contentPort.onMessage.addListener(function(message) {
