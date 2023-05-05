@@ -5,27 +5,29 @@ function censor(tweetDiv) {
 
     tweetDiv.addEventListener('click', function(event) {
 
-        // Hide or show depending on "show" class
-        if (tweetDiv.classList.contains("show")) {
+        if (tweetDiv.classList.contains("censored")) {
+            // Hide or show depending on "show" class
+            if (tweetDiv.classList.contains("show")) {
 
-            const element = event.target;
+                const element = event.target;
 
-            // Click censored tweet then "show more"? Show
-            if (tweetDiv.innerText != element.innerText && element.innerText == "Show more") {
-                tweetDiv.classList.remove("show");
-            }
-            // Show
-            else {
-                tweetDiv.classList.remove("show");
+                // Click censored tweet then "show more"? Show
+                if (tweetDiv.innerText != element.innerText && element.innerText == "Show more") {
+                    tweetDiv.classList.remove("show");
+                }
+                // Show
+                else {
+                    tweetDiv.classList.remove("show");
+                    event.stopPropagation();
+                }
+
+            } 
+            else if (!tweetDiv.classList.contains("show")){ 
+        
+                tweetDiv.classList.add("show");
                 event.stopPropagation();
+                
             }
-
-        } 
-        else if (!tweetDiv.classList.contains("show")){ 
-    
-            tweetDiv.classList.add("show");
-            event.stopPropagation();
-            
         }
 
     });
@@ -34,19 +36,32 @@ function censor(tweetDiv) {
 
 function showReportToast(message) {
 
-    const toast = document.createElement('div');
+    const confirmReport = document.createElement("div");
+    confirmReport.classList.add("confirm-report");
+    const btnContainer = document.createElement("div");
+    const yesBtn = document.createElement("button");
+    yesBtn.name = "Yes";
+    const noBtn = document.createElement("button");
+    noBtn.name = "No";
+
+    btnContainer.appendChild(yesBtn);
+    btnContainer.appendChild(noBtn);
+    confirmReport.appendChild(btnContainer);
+    document.body.appendChild(confirmReport);
+
+    const toast = document.createElement("div");
     toast.id = "toast";
     toast.innerText = message;
     document.body.appendChild(toast);
-    // Get the snackbar DIV
-    var x = document.getElementById("toast");
+    // Get the toast DIV
+    var toastDiv = document.getElementById("toast");
 
     // Add the "show" class to DIV
-    x.classList.add("show");
+    toastDiv.classList.add("show");
 
     // After 3 seconds, remove the show class from DIV
     setTimeout(function(){
-        x.className = x.className.replace("show", ""); 
+        toastDiv.className = toastDiv.className.replace("show", ""); 
         document.body.removeChild(x);
     }, 3000);
 
@@ -88,15 +103,13 @@ function addReportButton(tweetDiv) {
                 
                 // Expected result
                 if (tweetDiv.classList.contains("censored")) {
-                    chrome.runtime.sendMessage({ action: "report", tweet: tweet, expected : "uncesored" });
+                    port.postMessage({ action: "report", tweet: tweet, prediction : "Non-Abusive" });
                     showReportToast("Tweet Reported: Should not be censored.");
                 }
                 else {
-                    chrome.runtime.sendMessage({ action: "report", tweet: tweet, expected : "censored" });
+                    port.postMessage({ action: "report", tweet: tweet, prediction : "Abusive" });
                     showReportToast("Tweet Reported: Should be censored.");
                 }
-                
-                
                 
             });
         }
@@ -124,7 +137,13 @@ function hideTweets() {
                 const overlayDiv = document.createElement('div');
                 overlayDiv.style.backgroundColor = bodyColor;
                 overlayDiv.classList.add('overlay');
+                
+                const loader = document.createElement('div');
+                loader.classList.add("loader");
+
+                overlayDiv.appendChild(loader);
                 tweetDiv.appendChild(overlayDiv);
+                
             }
         }
 
@@ -202,8 +221,13 @@ port.onMessage.addListener((message) => {
             if (message.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
                 censor(tweetDiv);
             }
+            // Non-Abusive but censored? -> uncensor
+            else if (message.prediction === "Non-Abusive" && tweetDiv.classList.contains("censored")) {
+                tweetDiv.classList.remove("censored");
+            }
     
             tweetDiv.classList.add("predicted");
+            addReportButton(tweetDiv);
             console.log(message.tweet, message.prediction);
             
         }
@@ -213,6 +237,7 @@ port.onMessage.addListener((message) => {
 });
 
 hideTweets();
+const allowedLanguages = ["in", "fil", "tl"];
 
 // Loop interval
 setInterval(function() {
@@ -227,16 +252,20 @@ setInterval(function() {
             const tweet = tweetDiv.textContent;
             const language = tweetDiv.getAttribute("lang");
  
-            if (tweetDiv.classList.contains("sent") || language === "en") {
+            if (tweetDiv.classList.contains("sent")) {
                 if (tweetDiv.classList.contains("predicted")) {
                     showTweet(tweetDiv);
                 }
                 continue;
             }
 
-            port.postMessage({ tweet : tweet });
-
-            addReportButton(tweetDiv);
+            if (allowedLanguages.includes(language)) {
+                port.postMessage({ tweet : tweet, lang: language });
+            }
+            else {
+                port.postMessage({ tweet : tweet, lang: "not_tl" });
+            }   
+            
             tweetDiv.classList.add("sent");
 
         }

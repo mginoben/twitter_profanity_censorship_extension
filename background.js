@@ -114,17 +114,25 @@ function addToFeed(tweet, prediction) {
 	}
 }
 
-// function updateBadge() {
-// 	// Set badge behaviour
-// 	if (countAbusive(tweetPredictions) > 0) {
-// 		chrome.action.setBadgeTextColor({ color: '#ffffff', tabId: sender.tab.id  });
-// 		chrome.action.setBadgeBackgroundColor({ color: "#5A5A5A", tabId: sender.tab.id });
-// 		chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: sender.tab.id });
-// 	}
-// 	else {
-// 		chrome.action.setBadgeText({text: "", tabId: sender.tab.id });
-// 	}
-// }
+function saveTweet(overall, feed, tweet, prediction) {
+
+	if (overall === true && !findTweet(tweetPredictions, tweet)) {
+		console.log("Saving to overall tweets...", tweet);
+		tweetPredictions.push({ 
+			tweet: tweet, 
+			prediction: prediction 
+		});
+	}
+
+	if (feed === true && !findTweet(feedTweetPredictions, tweet)) {
+		console.log("Saving to feed tweets...", tweet);
+		feedTweetPredictions.push({ 
+			tweet: tweet, 
+			prediction: prediction 
+		});
+	}
+
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
@@ -315,69 +323,78 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			// console.log("Received message from content script:", message);
 
-			// Content script sends tweet
 			if (message.tweet) {
 
-				// Check if already in predicted list
 				const foundTweet = findTweet(tweetPredictions, message.tweet);
-	
-				// If not found or pending -> predict
+
 				if (!foundTweet) {
 
-					query(message.tweet.toLowerCase()).then(prediction => {
-		
-						// Predict error? -> send back to content script as pending
-						if (!prediction) {
-							console.log("Prediction error! Sending back to content script:", message.tweet);
-							contentPort.postMessage({ 
-								tweet: message.tweet, 
-								prediction: "Pending" 
-							});
-							return;
-						}
+					if (message.lang === "not_tl") {
 
-						// Send back to content with predictions
+						const prediction = "Not Tagalog";
+
 						contentPort.postMessage({ 
 							tweet : message.tweet,
 							prediction: prediction
 						});
 
-						// Add to predicted list
-						tweetPredictions.push({ 
-							tweet: message.tweet, 
-							prediction: prediction 
+						saveTweet(true, true, message.tweet, prediction);
+
+						return;
+					}
+
+					console.log("Predicting...", message.tweet);
+
+					query(message.tweet).then(prediction => {
+		
+						if (!prediction) {
+							console.log("Prediction failed. Predicting again...", message.tweet);
+							contentPort.postMessage({ 
+								tweet : message.tweet,
+								prediction: "Pending"
+							});
+							return;
+						}
+						
+						contentPort.postMessage({ 
+							tweet : message.tweet,
+							prediction: prediction
 						});
 
-						// Add to current feed list
-						feedTweetPredictions.push({ 
-							tweet: message.tweet, 
-							prediction: prediction 
-						});
-
-						console.log("Tweet:", message.tweet, "\nResult:", prediction);
+						saveTweet(true, true, message.tweet, prediction);
 
 					});
 
-
 				}
-				// Tweet already predicted? -> censor if abusive, push to current feed list
 				else {
 
-					console.log("Sending...", foundTweet.tweet);
+					console.log("Retrieving...", foundTweet.tweet);
+
 					contentPort.postMessage({ 
 						tweet : foundTweet.tweet,
 						prediction: foundTweet.prediction
 					});
 
-					if (!findTweet(feedTweetPredictions, foundTweet.tweet)) {
-						feedTweetPredictions.push({
-							tweet: foundTweet.tweet, 
-							prediction: foundTweet.prediction
-						});
-					}
+					saveTweet(false, true, foundTweet.tweet, foundTweet.prediction);
 
 				}
 
+			}
+
+			if (message.action === "report") {
+				console.log(message);
+				for (let i = 0; i < tweetPredictions.length; i++) {
+					if (tweetPredictions[i].tweet === message.tweet) {
+						tweetPredictions[i].prediction = message.prediction;
+						contentPort.postMessage({ 
+							tweet : message.tweet,
+							prediction: message.prediction
+						});
+						console.log("Tweet reported:", tweetPredictions[i].tweet);
+						break;
+					}
+				}
+				console.log(tweetPredictions);
 			}
 
 		});

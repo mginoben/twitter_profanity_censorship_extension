@@ -51,7 +51,7 @@ function updatePopup(message) {
         censoredResult.style.color = "#b4e092";
     }
     else if (message.censoredRatio >= 50 && message.tweetCount >= 10) {
-        censoredResult.style.color = "#e69393";
+        censoredResult.style.color = "#ff8a90";
     }
     else if (message.tweetCount == 0 && message.censoredCount == 0) {
         censoredRatio.textContent = 0;
@@ -66,7 +66,7 @@ function updatePopup(message) {
         feedCensoredResult.style.color = "#b4e092";
     }
     else if (message.feedCensoredRatio >= 50 && message.feedTweetCount >= 10) {
-        feedCensoredResult.style.color = "#e69393";
+        feedCensoredResult.style.color = "#ff8a90";
     }
     else if (message.feedTweetCount == 0 && message.feedCensoredCount == 0) {
         feedCensoredRatio.textContent = 0;

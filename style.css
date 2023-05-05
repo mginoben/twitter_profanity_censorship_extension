@@ -1,6 +1,6 @@
 @font-face {
   font-family: alte;
-  src: url(fonts/alte.ttf);
+  src: url("fonts/alte.ttf") format("ttf");
 }
 
 body.loading {
@@ -72,10 +72,7 @@ body.loading {
   color: #174f5c;
   background-color:gainsboro;
   border-radius: 4px;
-  padding: 5px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  /* padding: 5px; */
   position: fixed;
   top:0;
   right: 0;
@@ -114,22 +111,41 @@ body.loading {
   z-index: 1;
 }
 
+.loader {
+  /* position: fixed; */
+  /* top: 0; */
+  /* left: 0; */
+  margin-left: 15%;
+  margin-top: 3%;
+  border: 4px solid #f3f3f3; /* Light grey */
+  border-top: 4px solid #FACF4A; /* Blue */
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* The snackbar - position it at the bottom and in the middle of the screen */
 #toast {
   visibility: hidden; /* Hidden by default. Visible on click */
-  min-width: 250px; /* Set a default minimum width */
-  margin-left: -125px; /* Divide value of min-width by 2 */
+  min-width: 200px; /* Set a default minimum width */
+  margin-left: -100px; /* Divide value of min-width by 2 */
   background-color: #DC3545; /* Black background color */
   color: #fff; /* White text color */
   text-align: center; /* Centered text */
   border-radius: 2px; /* Rounded borders */
-  padding: 16px; /* Padding */
+  padding: 5px; /* Padding */
   position: fixed; /* Sit on top of the screen */
   z-index: 1; /* Add a z-index if needed */
   left: 50%; /* Center the snackbar */
   bottom: 30px; /* 30px from the bottom */
   font-family: alte !important;
-  font-size: 20px;
+  font-size: 15px;
 }
 
 /* Show the snackbar when clicking on a button (class added with JavaScript) */
@@ -160,5 +176,11 @@ body.loading {
 @keyframes fadeout {
   from {bottom: 30px; opacity: 1;}
   to {bottom: 0; opacity: 0;}
+}
+
+.confirm-report {
+  width: 100px;
+  height: 60px;
+  background-color: #DC3545;
 }
 
