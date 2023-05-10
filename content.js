@@ -34,6 +34,61 @@ function censor(tweetDiv) {
 
 }
 
+function censorProfanity(tweetDiv, profanities) {
+    
+    if (!profanities || tweetDiv.classList.contains("censored-profanities")) {
+        return;
+    }
+    
+    var tweetContent = tweetDiv.innerHTML;
+	// Replace profanities in *****
+	for (let i = 0; i < profanities.length; i++) {
+		// Get the exact match of profane word
+		var matchedProfanity = new RegExp(profanities[i], "gi");
+		// Censored Profanity
+
+
+		// Styled Profanity
+		const mask = '<span class="censored-profanity">$&</span>';
+		// mask = '<span class="popup" style="color:red;">$&</span>'
+		// Generate a censored tweet
+		tweetContent = tweetContent.replace(matchedProfanity, mask);
+	}
+	// Replace the main tweet content
+	tweetDiv.innerHTML = tweetContent;
+
+    tweetDiv.addEventListener('click', function(event) {
+
+
+        // Hide or show depending on "show" class
+        if (tweetDiv.classList.contains("show-profanity")) {
+
+            const element = event.target;
+
+            // Click censored tweet then "show more"? Show
+            if (tweetDiv.innerText != element.innerText && element.innerText == "Show more") {
+                tweetDiv.classList.remove("show-profanity");
+            }
+            // Show
+            else {
+                tweetDiv.classList.remove("show-profanity");
+                event.stopPropagation();
+            }
+
+        } 
+        else if (!tweetDiv.classList.contains("show-profanity")){ 
+    
+            tweetDiv.classList.add("show-profanity");
+            event.stopPropagation();
+            
+        }
+        
+
+    });
+
+    tweetDiv.classList.add("censored-profanities");
+}
+
 function showReportToast(message) {
 
     const confirmReport = document.createElement("div");
@@ -193,11 +248,16 @@ function findTweetDiv(targetTweet) {
 // Connect to the background script
 
 var port = chrome.runtime.connect({name: 'content'});
+var toggleProfanity;
 
 // Listen for messages from the background script
 port.onMessage.addListener((message) => {
 
     // console.log('Received message from background script:', message);
+    if (message.toggleProfanity) {
+        console.log("TOGGLE", message.toggleProfanity.toggleProfanity);
+        toggleProfanity =  message.toggleProfanity.toggleProfanity;
+    }
 
     if (message.tweet) {
 
@@ -219,7 +279,13 @@ port.onMessage.addListener((message) => {
 
             // Abusive tweet? -> censor
             if (message.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
-                censor(tweetDiv);
+                if (toggleProfanity) {
+                    censorProfanity(tweetDiv, message.profanities)
+                }
+                else {
+                    censor(tweetDiv);
+                }
+                
             }
             // Non-Abusive but censored? -> uncensor
             else if (message.prediction === "Non-Abusive" && tweetDiv.classList.contains("censored")) {
@@ -237,7 +303,7 @@ port.onMessage.addListener((message) => {
 });
 
 hideTweets();
-const allowedLanguages = ["in", "fil", "tl"];
+var allowedLanguages = ["in", "fil", "tl"];
 
 // Loop interval
 setInterval(function() {

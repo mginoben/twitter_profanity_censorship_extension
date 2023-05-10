@@ -62,25 +62,27 @@ function sendMessage(message) {
 }
 
 async function query(tweet) {
+	
+	const expectedOutputs = ["Abusive", "Non-Abusive", "No Profanity"]
     try {
-        const response = await fetch("https://mginoben-tagalog-profanity-censorship.hf.space/run/predict", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                data: [
-                    tweet,
-                ]
-            })
-        });
+		const response = await fetch("https://mginoben-tagalog-profanity-classification.hf.space/run/predict", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				data: [
+					tweet,
+				]
+			})
+		});
 
         if (response.ok) {
-            const expectedResults = ["Abusive", "Non-Abusive", "No Profanity"];
-            const result = await response.json();
-            const prediction = result["data"][0]["label"];
-            
-            if (expectedResults.includes(prediction)) {
-                return prediction;
-            }
+
+			const result = await response.json();
+			const data = result["data"];
+
+			if (expectedOutputs.includes(data[0])) {
+				return data;
+			}
 
         } else {
             console.log("Loading model please wait...");
@@ -114,13 +116,14 @@ function addToFeed(tweet, prediction) {
 	}
 }
 
-function saveTweet(overall, feed, tweet, prediction) {
+function saveTweet(overall, feed, tweet, prediction, profanities) {
 
 	if (overall === true && !findTweet(tweetPredictions, tweet)) {
 		console.log("Saving to overall tweets...", tweet);
 		tweetPredictions.push({ 
 			tweet: tweet, 
-			prediction: prediction 
+			prediction: prediction,
+			profanities : profanities
 		});
 	}
 
@@ -128,7 +131,8 @@ function saveTweet(overall, feed, tweet, prediction) {
 		console.log("Saving to feed tweets...", tweet);
 		feedTweetPredictions.push({ 
 			tweet: tweet, 
-			prediction: prediction 
+			prediction: prediction,
+			profanities : profanities
 		});
 	}
 
@@ -210,6 +214,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 				}).then(() => console.log("injected script file"));
 
 				chrome.action.setIcon({ path: "images/censored-128x128.png" });
+
 			}
 			else {
 				chrome.action.setIcon({ path: "images/uncensored-128x128.png" });
@@ -220,7 +225,6 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
 
 });
-
 
 let popupPort;
 let contentPort;
@@ -272,6 +276,14 @@ chrome.runtime.onConnect.addListener(function(port) {
 			console.log("Toggle state sent.");
 		});
 
+		chrome.storage.local.get(["toggleProfanity"], function(toggle){
+			console.log(toggle);
+			popupPort.postMessage({
+				toggleProfanity: toggle.toggleProfanity
+			})
+		
+		});
+
 	  	// Listen for messages from the popup script
 	  	popupPort.onMessage.addListener(function(message) {
 			console.log("Received message from popup script:", message);
@@ -314,6 +326,36 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			}
 
+			if (message.toggleProfanity === true) {
+
+				// Save current toggle state (true)
+				chrome.storage.local.set({ "toggleProfanity": true });
+
+				// Reload all twitter page
+				chrome.tabs.query({ url: "*://twitter.com/*" }, function(tabs) {
+					console.log(tabs);
+					for (var i = 0; i < tabs.length; i++) {
+						chrome.tabs.reload(tabs[i].id);
+					}
+				});
+		
+			}
+
+			if (message.toggleProfanity === false) {
+
+				// Save current toggle state (true)
+				chrome.storage.local.set({ "toggleProfanity": false });
+
+				// Reload all twitter page
+				chrome.tabs.query({ url: "*://twitter.com/*" }, function(tabs) {
+					console.log(tabs);
+					for (var i = 0; i < tabs.length; i++) {
+						chrome.tabs.reload(tabs[i].id);
+					}
+				});
+
+			}
+
 	  	});
 	  
 	  // Handle disconnections
@@ -330,6 +372,14 @@ chrome.runtime.onConnect.addListener(function(port) {
 		// Save the port for later use
 		contentPort = port;
 
+		chrome.storage.local.get(["toggleProfanity"], function(toggle){
+			console.log(toggle);
+			contentPort.postMessage({
+				toggleProfanity: toggle
+			})
+		
+		});
+
 		// Listen for messages from the popup script
 		contentPort.onMessage.addListener(function(message) {
 
@@ -344,22 +394,23 @@ chrome.runtime.onConnect.addListener(function(port) {
 					if (message.lang === "not_tl") {
 
 						const prediction = "Not Tagalog";
+						const profanities = []
 
 						contentPort.postMessage({ 
 							tweet : message.tweet,
-							prediction: prediction
+							prediction: prediction,
 						});
 
-						saveTweet(true, true, message.tweet, prediction);
+						saveTweet(true, true, message.tweet, prediction, profanities);
 
 						return;
 					}
 
-					console.log("Predicting...", message.tweet);
+					query(message.tweet).then(data => {
 
-					query(message.tweet).then(prediction => {
+						console.log("Predicting...", message.tweet);
 		
-						if (!prediction) {
+						if (!data) {
 							console.log("Prediction failed. Predicting again...", message.tweet);
 							contentPort.postMessage({ 
 								tweet : message.tweet,
@@ -367,13 +418,19 @@ chrome.runtime.onConnect.addListener(function(port) {
 							});
 							return;
 						}
+
+						console.log(data);
+
+						const prediction = data[0];
+						const profanities = data[1];
 						
 						contentPort.postMessage({ 
 							tweet : message.tweet,
-							prediction: prediction
+							prediction: prediction,
+							profanities : profanities
 						});
 
-						saveTweet(true, true, message.tweet, prediction);
+						saveTweet(true, true, message.tweet, prediction, profanities);
 
 					});
 
@@ -384,10 +441,11 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 					contentPort.postMessage({ 
 						tweet : foundTweet.tweet,
-						prediction: foundTweet.prediction
+						prediction : foundTweet.prediction,
+						profanities : foundTweet.profanities
 					});
 
-					saveTweet(false, true, foundTweet.tweet, foundTweet.prediction);
+					saveTweet(true, true, message.tweet, foundTweet.prediction, foundTweet.profanities);
 
 				}
 

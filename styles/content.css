@@ -42,6 +42,13 @@ body.loading {
   user-select: none; /* Standard syntax */
 }
 
+.censored-profanity {
+  padding: 1px;
+  color: #8b8b8b !important;
+  background-color: #8b8b8b;
+  user-select: none; /* Standard syntax */
+}
+
 .show span {
   user-select: auto;
   pointer-events: auto;
@@ -61,6 +68,14 @@ body.loading {
   content-visibility: auto;
   background-color: transparent !important;
   opacity: 1;
+}
+
+.show-profanity .censored-profanity {
+  user-select: auto;
+  pointer-events: auto;
+  cursor:pointer;
+  color: #cc5b5b !important;
+  background-color: transparent !important;
 }
 
 .overlay-hidden {

@@ -10,6 +10,11 @@ port.onMessage.addListener((message) => {
         censorToggle.checked = message.toggleState;
     }
 
+    if (message.toggleProfanity) {
+        // Set button profanity check state
+        toggleProfanity.checked = message.toggleProfanity;
+    }
+
     if (message.popup) {
         updatePopup(message);
     }
@@ -45,6 +50,18 @@ var censorToggle = document.getElementById("censorToggle");
 var logPanel = document.getElementById("log-panel");
 var logWindow = document.getElementById("log-window");
 var toggleLog = document.getElementById("toggle-log");
+var toggleProfanity = document.getElementById("toggle-profanity");
+
+toggleProfanity.addEventListener("change", function() {
+  
+    if (this.checked) {
+      console.log("Profanity is checked.");
+      port.postMessage({toggleProfanity: true});
+    } else {
+      port.postMessage({toggleProfanity: false});
+    }
+  
+});
 
 toggleLog.addEventListener("click", function() {
 
@@ -57,7 +74,6 @@ toggleLog.addEventListener("click", function() {
     
   
 });
-
 
 censorToggle.addEventListener("change", function() {
 
@@ -103,23 +119,6 @@ function updatePopup(message) {
         feedCensoredResult.style.color = "#b4e092";
     }
 }
-
-
-// function updatePopup() {
-//   intervalID = setInterval(function() {
-    
-//     console.log("Updating popup...");
-
-//     port.postMessage({ popup: "update" });
-
-//     chrome.runtime.sendMessage({popup: "update"}, function(response) {
-
-      
-
-//     });
-
-//   }, 800);
-// }
 
 
 
