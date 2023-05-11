@@ -11,42 +11,33 @@ body.loading {
   content-visibility: hidden;
 }
 
-.censored {
-  padding-right: 30px !important;
-  /* padding: 2px; */
+.abusive {
+  color: #cc5b5b !important;
+}
+
+.censored,
+.censored * {
+  color: #8b8b8b !important;
+  background-color: #8b8b8b !important;
+  user-select: none; /* Standard syntax */
+  pointer-events: none;
+  text-decoration: none !important;
 }
 
 .censored span {
   padding: 1px;
-  color: #8b8b8b !important;
-  background-color: #8b8b8b;
-  user-select: none; /* Standard syntax */
 }
 
 .censored a {
-  text-decoration: none;
-  color: #8b8b8b !important;
-  background-color: #8b8b8b;
-  user-select: none;
-  pointer-events: none;
+  text-decoration: none !important;
   cursor: default;
 }
 
-.censored img {
-  margin: 0px;
-  margin-bottom: -1px !important;
-  content-visibility: hidden;
-  /* visibility: hidden; */
-  /* opacity: 0; */
-  background-color: #8b8b8b; 
-  user-select: none; /* Standard syntax */
-}
-
-.censored-profanity {
-  padding: 1px;
-  color: #8b8b8b !important;
-  background-color: #8b8b8b;
-  user-select: none; /* Standard syntax */
+.censored-img {
+  height: 20px;
+  vertical-align: -20% !important;
+  margin: 0px !important;
+  content-visibility: hidden !important;
 }
 
 .show span {

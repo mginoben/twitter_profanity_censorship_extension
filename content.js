@@ -1,34 +1,36 @@
 // Predicts tweet
 function censor(tweetDiv) {
 
-    tweetDiv.classList.add("censored");
+    if (tweetDiv.classList.contains("predicted")) {
+        return;
+    }
+
+    tweetDiv.style.paddingRight = "30px";
+
+    console.log("Censoring...", tweetDiv.textContent);
+
+    const tweetDivChildNodes = tweetDiv.childNodes;
+
+    tweetDivChildNodes.forEach(child=> {
+        console.log(child.tagName);
+        if (child.tagName === "IMG") {
+            child.classList.add("censored-img");
+        }
+        child.classList.add("censored", "abusive");
+    });
 
     tweetDiv.addEventListener('click', function(event) {
 
-        if (tweetDiv.classList.contains("censored")) {
-            // Hide or show depending on "show" class
-            if (tweetDiv.classList.contains("show")) {
-
-                const element = event.target;
-
-                // Click censored tweet then "show more"? Show
-                if (tweetDiv.innerText != element.innerText && element.innerText == "Show more") {
-                    tweetDiv.classList.remove("show");
-                }
-                // Show
-                else {
-                    tweetDiv.classList.remove("show");
-                    event.stopPropagation();
-                }
-
-            } 
-            else if (!tweetDiv.classList.contains("show")){ 
-        
-                tweetDiv.classList.add("show");
-                event.stopPropagation();
-                
+        tweetDivChildNodes.forEach(child => {
+            if (child.classList.contains("censored")) {
+                child.classList.remove("censored", "censored-img");
             }
-        }
+            else {
+                child.classList.add("censored", "censored-img");
+            }
+        });
+
+        event.stopPropagation();
 
     });
 
@@ -36,57 +38,41 @@ function censor(tweetDiv) {
 
 function censorProfanity(tweetDiv, profanities) {
     
-    if (!profanities || tweetDiv.classList.contains("censored-profanities")) {
+    if (tweetDiv.classList.contains("predicted")) {
         return;
     }
+
+    tweetDiv.style.paddingRight = "30px";
     
     var tweetContent = tweetDiv.innerHTML;
-	// Replace profanities in *****
-	for (let i = 0; i < profanities.length; i++) {
-		// Get the exact match of profane word
-		var matchedProfanity = new RegExp(profanities[i], "gi");
-		// Censored Profanity
 
-
-		// Styled Profanity
-		const mask = '<span class="censored-profanity">$&</span>';
-		// mask = '<span class="popup" style="color:red;">$&</span>'
-		// Generate a censored tweet
+	// Censor each profanity
+    profanities.forEach(profanity => {
+        var matchedProfanity = new RegExp(profanity, "gi");
+        const mask = '<span class="censored abusive">$&</span>';
 		tweetContent = tweetContent.replace(matchedProfanity, mask);
-	}
+    });
+
 	// Replace the main tweet content
 	tweetDiv.innerHTML = tweetContent;
 
     tweetDiv.addEventListener('click', function(event) {
 
+        const profanities = tweetDiv.querySelectorAll(".abusive");
 
-        // Hide or show depending on "show" class
-        if (tweetDiv.classList.contains("show-profanity")) {
-
-            const element = event.target;
-
-            // Click censored tweet then "show more"? Show
-            if (tweetDiv.innerText != element.innerText && element.innerText == "Show more") {
-                tweetDiv.classList.remove("show-profanity");
+        profanities.forEach(profanity => {
+            if (profanity.classList.contains("censored")) {
+                profanity.classList.remove("censored");
             }
-            // Show
             else {
-                tweetDiv.classList.remove("show-profanity");
-                event.stopPropagation();
+                profanity.classList.add("censored");
             }
-
-        } 
-        else if (!tweetDiv.classList.contains("show-profanity")){ 
-    
-            tweetDiv.classList.add("show-profanity");
-            event.stopPropagation();
-            
-        }
+        });
         
+        event.stopPropagation();
 
     });
 
-    tweetDiv.classList.add("censored-profanities");
 }
 
 function showReportToast(message) {
@@ -183,7 +169,7 @@ function hideTweets() {
 
             const language = tweetDiv.getAttribute("lang");
     
-            if (language === "en") {
+            if (!allowedLanguages.includes(language)) {
                 return;
             }
         
@@ -207,6 +193,11 @@ function hideTweets() {
 }
 
 function showTweet(tweetDiv) {
+
+    if (!tweetDiv.classList.contains("predicted")) {
+        return;
+    }
+
     if (tweetDiv.lastChild.classList.contains("overlay") || tweetDiv.querySelector(".overlay")) {
         tweetDiv.removeChild(tweetDiv.lastChild);
     }
@@ -303,6 +294,7 @@ port.onMessage.addListener((message) => {
 });
 
 hideTweets();
+
 var allowedLanguages = ["in", "fil", "tl"];
 
 // Loop interval
@@ -338,7 +330,7 @@ setInterval(function() {
 
     }
         
-}, 1000);
+}, 800);
 
 
 

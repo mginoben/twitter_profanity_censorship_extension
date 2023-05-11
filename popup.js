@@ -1,9 +1,15 @@
 // Connect to the background script
 const port = chrome.runtime.connect({name: 'popup'});
 
+// Alert toggle
+var alertUser; 
+var alertUserFeed; 
+
+// TODO Nofication
+
 // Listen for messages from the background script
 port.onMessage.addListener((message) => {
-    console.log('Received message:', message);
+    // console.log('Received message:', message);
 
     if (message.toggleState) {
         // Set button check state
@@ -97,6 +103,10 @@ function updatePopup(message) {
     censoredCount.textContent = message.censoredCount;
 
     if (message.censoredRatio >= 50 && message.tweetCount >= 10) {
+        if (alertUser !== true) {
+            console.log("Abusive Overall Browsing");
+            alertUser = true;
+        }
         censoredResult.style.color = "#ff8a90";
     }
     else if (message.tweetCount == 0 && message.censoredCount == 0) {
@@ -104,11 +114,19 @@ function updatePopup(message) {
         censoredCount.textContent = 0;
     }
     else {
+        if (alertUser !== false) {
+            console.log("Non Abusive Overall Browsing");
+            alertUser = false;
+        }
         censoredResult.style.color = "#b4e092";
     }
 
 
     if (message.feedCensoredRatio >= 50 && message.feedTweetCount >= 10) {
+        if (alertUserFeed !== true) {
+            console.log("Abusive Timeline");
+            alertUserFeed = true;
+        }
         feedCensoredResult.style.color = "#ff8a90";
     }
     else if (message.feedTweetCount == 0 && message.feedCensoredCount == 0) {
@@ -116,6 +134,10 @@ function updatePopup(message) {
         feedCensoredCount.textContent = 0;
     }
     else {
+        if (alertUserFeed !== false) {
+            console.log("Non Abusive Timeline");
+            alertUserFeed = false;
+        }
         feedCensoredResult.style.color = "#b4e092";
     }
 }

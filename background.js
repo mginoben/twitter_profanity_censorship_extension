@@ -288,6 +288,14 @@ chrome.runtime.onConnect.addListener(function(port) {
 	  	popupPort.onMessage.addListener(function(message) {
 			console.log("Received message from popup script:", message);
 
+			if (message.alertUser === true) {
+				console.log("ABUSIVE");
+			}
+
+			if (message.alertUser === false) {
+				console.log("NOT ABUSIVE");
+			}
+			
 			// Toggle turned on
 			if (message.toggleState === true) {
 
@@ -419,7 +427,7 @@ chrome.runtime.onConnect.addListener(function(port) {
 							return;
 						}
 
-						console.log(data);
+						console.log(message.tweet, data);
 
 						const prediction = data[0];
 						const profanities = data[1];
