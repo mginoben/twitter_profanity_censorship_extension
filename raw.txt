@@ -1,1 +1,1 @@
-[object Object]
+{"foo":"adadasdsad","baz":[1,2,3,1]}
