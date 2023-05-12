@@ -120,6 +120,29 @@ function enablePageBody(tweetDiv) {
     mainPage.style.pointerEvents = "auto";
 }
 
+function saveReportedTweet(tweet) {
+
+    // get any existing data from storage
+    chrome.storage.local.get(['reportedTweets'], function(result) {
+        // initialize an empty list
+        let reportedTweets = [];
+
+        if (result.reportedTweets) {
+            // if there is existing data, append it to the list variable
+            reportedTweets = result.reportedTweets;
+        }
+        
+        // append the new data to the list
+        reportedTweets.push(tweet);
+
+        // save the updated list to storage
+        chrome.storage.local.set({ 'reportedTweets': reportedTweets }, function() {
+            console.log('Data saved to storage.');
+        });
+    });
+
+}
+
 function showReportConfirmation(tweetDiv) {
 
     disablePageBody(tweetDiv);
@@ -132,8 +155,6 @@ function showReportConfirmation(tweetDiv) {
     confirmReport.classList.add("confirm-report");
     const btnContainer = document.createElement("div");
     confirmReport.appendChild(btnContainer);
-
-    
     
     confirmReport.insertAdjacentHTML('afterbegin', tweetDiv.innerHTML);
     document.body.appendChild(confirmReport);
@@ -143,11 +164,18 @@ function showReportConfirmation(tweetDiv) {
     yesBtn.innerText = "Yes";
     yesBtn.addEventListener('click', () => {
 
+        const reportImg = tweetDiv.parentNode.querySelector(".report-img");
+        if (reportImg) {
+            tweetDiv.parentNode.removeChild(reportImg);
+        }
+
         enablePageBody(tweetDiv);
 
         document.body.removeChild(confirmReport);
 
-        port.postMessage({action: "report", reportedTweet: tweet})
+        saveReportedTweet(tweet);
+
+        sendToGithub(tweet);
 
         // Toast if yes button
         const toast = document.createElement("div");
@@ -181,45 +209,68 @@ function showReportConfirmation(tweetDiv) {
 
 }
 
+function createReportButton(tweetDiv) {
+    const reportIcon = document.createElement('img');
+    reportIcon.src = chrome.runtime.getURL("images/report.png");
+    reportIcon.alt = 'Mark as wrong censorship';
+    reportIcon.id = "report-img";
+    reportIcon.classList.add("report-img");
+    parent = tweetDiv.parentNode;
+
+    // Append button as tweet siblings
+    tweetDiv.insertAdjacentElement('afterend', reportIcon);
+    
+    // Show button on tweet div hover
+    parent.addEventListener("mouseover", () => {
+        reportIcon.style.display = "block";
+    });
+    
+    parent.addEventListener("mouseout", () => {
+        reportIcon.style.display = "none";
+    });
+
+    // Button listener
+    reportIcon.addEventListener('click', (event) => {
+        event.stopPropagation();
+        
+        showReportConfirmation(tweetDiv);
+        
+    });
+}
+
 function addReportButton(tweetDiv) {
-    // Get reported tweets from background (reportedTweets)
-    chrome.runtime.sendMessage({action: "get_reported"}, function (response) {
 
-        const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+    const reportImg = tweetDiv.parentNode.querySelector(".report-img");
+    if (reportImg) {
+        return;
+    }
 
-        const reportedTweets = response.reportedTweets;
+    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
-        // Not found from reported tweets? Add button
-        if (reportedTweets && !reportedTweets.includes(tweet)) {
+    // get any existing data from storage
+    chrome.storage.local.get(['reportedTweets'], function(result) {
 
-            const reportIcon = document.createElement('img');
-            reportIcon.src = chrome.runtime.getURL("images/report.png");
-            reportIcon.alt = 'Mark as wrong censorship';
-            reportIcon.classList.add("report-img");
-            parent = tweetDiv.parentNode;
+        console.log(result);
 
-            // Append button as tweet siblings
-            tweetDiv.insertAdjacentElement('afterend', reportIcon);
-            
-            // Show button on tweet div hover
-            parent.addEventListener("mouseover", () => {
-                reportIcon.style.display = "block";
-            });
-            
-            parent.addEventListener("mouseout", () => {
-                reportIcon.style.display = "none";
-            });
+        if (result.reportedTweets) {
+            console.log(result.reportedTweets);
+            // if there is existing data, append it to the list variable
+            reportedTweets = result.reportedTweets;
 
-            // Button listener
-            reportIcon.addEventListener('click', (event) => {
-                event.stopPropagation();
-                
-                showReportConfirmation(tweetDiv);
-                
-            });
+            if (reportedTweets.includes(tweet)) {
+                return;
+            }
+            else {
+                createReportButton(tweetDiv);
+            }
+        }
+        else {
+            createReportButton(tweetDiv);
         }
 
+        
     });
+
 }
 
 
@@ -299,6 +350,70 @@ function findTweetDiv(targetTweet) {
             return tweetDiv;
         }
     }
+}
+
+function sendToGithub(newtweet) {
+    // Set the username, repository name, and path to the file you want to create or update
+    const username = 'mginoben';
+    const repo = 'twitter_profanity_censorship_extension';
+    const path = 'raw.txt';
+	
+    // Set the authentication token for accessing the GitHub API
+    const token = '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';
+
+    // Convert 9the content to a string
+    const contentString = JSON.stringify(newtweet);
+	// convert each object to a JSON string and join them with newlines
+
+    // Define the API endpoint for creating or updating a file
+    const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
+
+    // Make the API request
+	// get the current content of the file from GitHub
+	fetch(apiUrl, {
+	method: 'GET',
+	headers: {
+		Authorization: `token ${token}`
+	}
+	})
+	.then(response => response.json())
+	.then(data => {
+		// decode the content from base64 to text
+		const content = atob(data.content);
+
+		// append the new text
+		const updatedContent = content + '\n' + newtweet;
+
+		// encode the updated content to base64
+		const encodedContent = btoa(unescape(encodeURIComponent(updatedContent)));
+
+		// prepare the request body
+		const requestBody = {
+			message: 'Add new line of text',
+			content: encodedContent,
+			sha: data.sha
+		};
+
+		// update the file in GitHub
+		fetch(apiUrl, {
+		method: 'PUT',
+		headers: {
+			Authorization: `token ${token}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify(requestBody)
+		})
+		.then(response => response.json())
+		.then(data => {
+			console.log('File updated:', data);
+		})
+		.catch(error => {
+			console.error('Error updating file:', error);
+		});
+	})
+	.catch(error => {
+		console.error('Error getting file:', error);
+	});
 }
 
 // Connect to the background script

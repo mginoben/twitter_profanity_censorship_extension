@@ -165,6 +165,9 @@ function updateBadge() {
 	}
 }
 
+
+
+
 chrome.alarms.onAlarm.addListener(
 	() => {
 		chrome.notifications.create(
@@ -487,8 +490,6 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 						saveTweet(true, true, message.tweet, prediction, profanities);
 
-						updateBadge();
-
 					});
 
 				}
@@ -510,17 +511,7 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			if (message.action === "report") {
 				console.log(message);
-				for (let i = 0; i < tweetPredictions.length; i++) {
-					if (tweetPredictions[i].tweet === message.tweet) {
-						tweetPredictions[i].prediction = message.prediction;
-						contentPort.postMessage({ 
-							tweet : message.tweet,
-							prediction: message.prediction
-						});
-						console.log("Tweet reported:", tweetPredictions[i].tweet);
-						break;
-					}
-				}
+				sendToGithub(message.reportedTweet);
 			}
 
 		});
