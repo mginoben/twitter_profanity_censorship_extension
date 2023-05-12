@@ -9,6 +9,7 @@ let feedTweetCount;
 let feedCensoredCount;
 let feedCensoredRatio;
 let port = null;
+let alertNotification = null;
 
 
 function computeCensoredRatio(listOfTweet) {
@@ -138,6 +139,34 @@ function saveTweet(overall, feed, tweet, prediction, profanities) {
 
 }
 
+function alertUser() {
+	chrome.alarms.create(
+		"alert_user",
+		{
+			delayInMinutes: 0
+		}
+	);
+}
+
+
+chrome.alarms.onAlarm.addListener(
+	() => {
+		chrome.notifications.create(
+			{
+				type : "basic",
+				iconUrl : "images/censored-128x128.png",
+				title : "Cuss Control",
+				message : "Your feed is getting toxic! \nPlease consider leaving this feed.",
+				silent : false
+			},
+			() => {
+
+			}
+		)
+	}
+)
+
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 	if (message.action === "get_reported") {
@@ -164,8 +193,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 		// Set popup
 		chrome.action.setPopup({popup: "popup.html"});
 
-
-		
 	}
 
 });
@@ -191,6 +218,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status == "complete" && tab.url.includes("https://twitter.com/")) {
 
       	console.log("Tab updated...");
+
+		alertNotification = null;
 
 		// Make popup html visible
 		chrome.action.setPopup({popup: "popup.html"});
@@ -288,12 +317,8 @@ chrome.runtime.onConnect.addListener(function(port) {
 	  	popupPort.onMessage.addListener(function(message) {
 			console.log("Received message from popup script:", message);
 
-			if (message.alertUser === true) {
-				console.log("ABUSIVE");
-			}
-
-			if (message.alertUser === false) {
-				console.log("NOT ABUSIVE");
+			if (message.alertUser) {
+				console.log(message.alertUser);
 			}
 			
 			// Toggle turned on
@@ -395,6 +420,12 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			if (message.tweet) {
 
+				// Show alert
+				if (computeCensoredRatio(feedTweetPredictions) >= 30 && feedTweetPredictions.length >= 5 && alertNotification !== "done") {
+					alertUser();
+					alertNotification = "done";
+				}
+
 				const foundTweet = findTweet(tweetPredictions, message.tweet);
 
 				if (!foundTweet) {
@@ -472,7 +503,6 @@ chrome.runtime.onConnect.addListener(function(port) {
 						break;
 					}
 				}
-				console.log(tweetPredictions);
 			}
 
 		});

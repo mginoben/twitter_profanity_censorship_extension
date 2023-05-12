@@ -12,7 +12,6 @@ function censor(tweetDiv) {
     const tweetDivChildNodes = tweetDiv.childNodes;
 
     tweetDivChildNodes.forEach(child=> {
-        console.log(child.tagName);
         if (child.tagName === "IMG") {
             child.classList.add("censored-img");
         }
@@ -75,36 +74,96 @@ function censorProfanity(tweetDiv, profanities) {
 
 }
 
-function showReportToast(message) {
+function disablePageBody() {
+    const mainPage = document.getElementsByTagName("MAIN")[0];
+    const feedsPanel = document.querySelector('[data-testid="primaryColumn"]');
+    const header = document.getElementsByTagName("HEADER")[0];
 
+    header.style.pointerEvents = "none";
+    feedsPanel.style.pointerEvents = "none";
+    mainPage.style.pointerEvents = "none";
+}
+
+function enablePageBody(tweetDiv) {
+    // get all the child elements of the parent div
+    const censoredProfanities = tweetDiv.querySelectorAll('.censored'); //TODO recensor tweet
+
+    // loop through each child element and remove the 'my-class' class
+    censoredProfanities.forEach((censoredProfanity) => {
+        censoredProfanity.classList.remove('censored');
+    });
+
+    const mainPage = document.getElementsByTagName("MAIN")[0];
+    const feedsPanel = document.querySelector('[data-testid="primaryColumn"]');
+    const header = document.getElementsByTagName("HEADER")[0];
+
+    header.style.pointerEvents = "auto";
+    feedsPanel.style.pointerEvents = "auto";
+    mainPage.style.pointerEvents = "auto";
+}
+
+function showReportConfirmation(tweetDiv) {
+
+    disablePageBody();
+
+    // get all the child elements of the parent div
+    const censoredProfanities = tweetDiv.querySelectorAll('.censored');
+
+    // loop through each child element and remove the 'my-class' class
+    censoredProfanities.forEach((censoredProfanity) => {
+        censoredProfanity.classList.remove('censored');
+    });
+
+    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+
+    // Confirmation window for report
     const confirmReport = document.createElement("div");
+    confirmReport.innerHTML = "<p>Report this tweet?</p>";
     confirmReport.classList.add("confirm-report");
     const btnContainer = document.createElement("div");
-    const yesBtn = document.createElement("button");
-    yesBtn.name = "Yes";
-    const noBtn = document.createElement("button");
-    noBtn.name = "No";
-
-    btnContainer.appendChild(yesBtn);
-    btnContainer.appendChild(noBtn);
     confirmReport.appendChild(btnContainer);
+    confirmReport.insertAdjacentHTML('afterbegin', tweetDiv.innerHTML);
     document.body.appendChild(confirmReport);
 
+    // Toast if yes button
     const toast = document.createElement("div");
     toast.id = "toast";
-    toast.innerText = message;
-    document.body.appendChild(toast);
-    // Get the toast DIV
-    var toastDiv = document.getElementById("toast");
 
-    // Add the "show" class to DIV
-    toastDiv.classList.add("show");
+    // Yes button
+    const yesBtn = document.createElement("button");
+    yesBtn.innerText = "Yes";
+    yesBtn.addEventListener('click', () => {
 
-    // After 3 seconds, remove the show class from DIV
-    setTimeout(function(){
-        toastDiv.className = toastDiv.className.replace("show", ""); 
-        document.body.removeChild(x);
-    }, 3000);
+        enablePageBody();
+
+        port.postMessage({action: "report", reportedTweet: tweet})
+
+        document.body.removeChild(confirmReport);
+        document.body.appendChild(toast);
+        var toastDiv = document.getElementById("toast");
+        toastDiv.classList.add("show");
+        // After 3 seconds, remove the show class from DIV
+        setTimeout(function(){
+            toastDiv.className = toastDiv.className.remove("show"); 
+            document.body.removeChild(toast);
+        }, 3000);
+
+    });
+    btnContainer.appendChild(yesBtn);
+
+    // No button
+    const noBtn = document.createElement("button");
+    noBtn.innerText = "No";
+    noBtn.addEventListener('click', () => {
+
+        enablePageBody();
+
+        document.body.removeChild(confirmReport);
+
+        mainPage.style.pointerEvents = "auto";
+        header.style.pointerEvents = "auto";
+    });
+    btnContainer.appendChild(noBtn);
 
 }
 
@@ -118,39 +177,30 @@ function addReportButton(tweetDiv) {
 
         // Not found from reported tweets? Add button
         if (reportedTweets && !reportedTweets.includes(tweet)) {
-            const img = document.createElement('img');
-            img.src = chrome.runtime.getURL("images/report.png");
-            img.alt = 'Mark as wrong censorship';
-            img.classList.add("report-img");
+
+            const reportIcon = document.createElement('img');
+            reportIcon.src = chrome.runtime.getURL("images/report.png");
+            reportIcon.alt = 'Mark as wrong censorship';
+            reportIcon.classList.add("report-img");
             parent = tweetDiv.parentNode;
 
             // Append button as tweet siblings
-            tweetDiv.insertAdjacentElement('afterend', img);
+            tweetDiv.insertAdjacentElement('afterend', reportIcon);
             
             // Show button on tweet div hover
             parent.addEventListener("mouseover", () => {
-                img.style.display = "block";
+                reportIcon.style.display = "block";
             });
             
             parent.addEventListener("mouseout", () => {
-                img.style.display = "none";
+                reportIcon.style.display = "none";
             });
 
             // Button listener
-            img.addEventListener('click', (event) => {
+            reportIcon.addEventListener('click', (event) => {
                 event.stopPropagation();
-                tweetDiv.parentNode.removeChild(img);
                 
-                
-                // Expected result
-                if (tweetDiv.classList.contains("censored")) {
-                    port.postMessage({ action: "report", tweet: tweet, prediction : "Non-Abusive" });
-                    showReportToast("Tweet Reported: Should not be censored.");
-                }
-                else {
-                    port.postMessage({ action: "report", tweet: tweet, prediction : "Abusive" });
-                    showReportToast("Tweet Reported: Should be censored.");
-                }
+                showReportConfirmation(tweetDiv);
                 
             });
         }

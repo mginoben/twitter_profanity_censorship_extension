@@ -25,20 +25,24 @@ port.onMessage.addListener((message) => {
         updatePopup(message);
     }
 
+    // Tweets Logging
     if (message.tweetPredictions) {
 
         logPanel.innerHTML = '';
 
         message.tweetPredictions.forEach(tweet => {
-            console.log(message.tweet);
+            
+            console.log(tweet);
             const tweetLog = document.createElement('div');
             tweetLog.textContent = tweet.tweet;
             tweetLog.classList.add("tweet-log");
+
             if (tweet.prediction === "Abusive") {
                 tweetLog.style.backgroundColor = "#ff8a90";
             } else {
                 tweetLog.style.backgroundColor = "#b4e092";
             }
+
             logPanel.appendChild(tweetLog);
         });
         
@@ -102,9 +106,9 @@ function updatePopup(message) {
     censoredRatio.textContent = message.censoredRatio;
     censoredCount.textContent = message.censoredCount;
 
-    if (message.censoredRatio >= 50 && message.tweetCount >= 10) {
+    if (message.censoredRatio >= 30 && message.tweetCount >= 5) {
         if (alertUser !== true) {
-            console.log("Abusive Overall Browsing");
+            port.postMessage({alertUser: "overall_browsing"});
             alertUser = true;
         }
         censoredResult.style.color = "#ff8a90";
@@ -121,10 +125,10 @@ function updatePopup(message) {
         censoredResult.style.color = "#b4e092";
     }
 
-
-    if (message.feedCensoredRatio >= 50 && message.feedTweetCount >= 10) {
+    if (message.feedCensoredRatio >= 30 && message.feedTweetCount >= 5) {
         if (alertUserFeed !== true) {
             console.log("Abusive Timeline");
+            port.postMessage({alertUser: "feed"});
             alertUserFeed = true;
         }
         feedCensoredResult.style.color = "#ff8a90";

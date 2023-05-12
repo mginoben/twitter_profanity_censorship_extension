@@ -1,6 +1,8 @@
 @font-face {
-  font-family: alte;
-  src: url("fonts/alte.ttf") format("ttf");
+  font-family: "simplysans";
+  src: url("/fonts/simplysans.ttf") format("truetype");
+  font-style: normal;
+  font-weight: normal;
 }
 
 body.loading {
@@ -150,7 +152,7 @@ body.loading {
   z-index: 1; /* Add a z-index if needed */
   left: 50%; /* Center the snackbar */
   bottom: 30px; /* 30px from the bottom */
-  font-family: alte !important;
+  font-family: sans-serif;
   font-size: 15px;
 }
 
@@ -185,8 +187,19 @@ body.loading {
 }
 
 .confirm-report {
-  width: 100px;
-  height: 60px;
-  background-color: #DC3545;
+  background-color: #470d13;
+  color: #fff; /* White text color */
+  text-align: center; /* Centered text */
+  border-radius: 2px; /* Rounded borders */
+  padding: 15px; /* Padding */
+  align-self: center;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1; /* Add a z-index if needed */
+  font-family: sans-serif;
+  font-size: 15px;
+  border-radius: 10px;
 }
 
