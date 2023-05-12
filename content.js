@@ -1,5 +1,5 @@
 // Predicts tweet
-function censor(tweetDiv) {
+function censorTweet(tweetDiv) {
 
     if (tweetDiv.classList.contains("predicted")) {
         return;
@@ -74,7 +74,15 @@ function censorProfanity(tweetDiv, profanities) {
 
 }
 
-function disablePageBody() {
+function disablePageBody(tweetDiv) {
+    // get all the child elements of the parent div
+    const censoredProfanities = tweetDiv.querySelectorAll('.censored');
+
+    // loop through each child element and remove the 'my-class' class
+    censoredProfanities.forEach((censoredProfanity) => {
+        censoredProfanity.classList.remove('censored');
+    });
+
     const mainPage = document.getElementsByTagName("MAIN")[0];
     const feedsPanel = document.querySelector('[data-testid="primaryColumn"]');
     const header = document.getElementsByTagName("HEADER")[0];
@@ -86,11 +94,11 @@ function disablePageBody() {
 
 function enablePageBody(tweetDiv) {
     // get all the child elements of the parent div
-    const censoredProfanities = tweetDiv.querySelectorAll('.censored'); //TODO recensor tweet
+    const censoredProfanities = tweetDiv.querySelectorAll('.abusive'); //TODO recensor tweet
 
     // loop through each child element and remove the 'my-class' class
     censoredProfanities.forEach((censoredProfanity) => {
-        censoredProfanity.classList.remove('censored');
+        censoredProfanity.classList.add('censored');
     });
 
     const mainPage = document.getElementsByTagName("MAIN")[0];
@@ -104,15 +112,7 @@ function enablePageBody(tweetDiv) {
 
 function showReportConfirmation(tweetDiv) {
 
-    disablePageBody();
-
-    // get all the child elements of the parent div
-    const censoredProfanities = tweetDiv.querySelectorAll('.censored');
-
-    // loop through each child element and remove the 'my-class' class
-    censoredProfanities.forEach((censoredProfanity) => {
-        censoredProfanity.classList.remove('censored');
-    });
+    disablePageBody(tweetDiv);
 
     const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
 
@@ -122,30 +122,38 @@ function showReportConfirmation(tweetDiv) {
     confirmReport.classList.add("confirm-report");
     const btnContainer = document.createElement("div");
     confirmReport.appendChild(btnContainer);
+
+    tweetDiv.childNodes.forEach(child => {
+        child.classList.replace("abusive", "non-abusive");
+    });
+    
     confirmReport.insertAdjacentHTML('afterbegin', tweetDiv.innerHTML);
     document.body.appendChild(confirmReport);
-
-    // Toast if yes button
-    const toast = document.createElement("div");
-    toast.id = "toast";
 
     // Yes button
     const yesBtn = document.createElement("button");
     yesBtn.innerText = "Yes";
     yesBtn.addEventListener('click', () => {
 
-        enablePageBody();
+        enablePageBody(tweetDiv);
+
+        document.body.removeChild(confirmReport);
 
         port.postMessage({action: "report", reportedTweet: tweet})
 
-        document.body.removeChild(confirmReport);
+        // Toast if yes button
+        const toast = document.createElement("div");
+        toast.id = "toast";
+        toast.innerText = "Tweet Reported. Thank You";
         document.body.appendChild(toast);
-        var toastDiv = document.getElementById("toast");
-        toastDiv.classList.add("show");
-        // After 3 seconds, remove the show class from DIV
+
+        const toastDiv = document.getElementById("toast");
+        toastDiv.classList.add("show-toast");
+
+        // After 3 seconds, remove the show class from toast
         setTimeout(function(){
-            toastDiv.className = toastDiv.className.remove("show"); 
-            document.body.removeChild(toast);
+            toastDiv.classList.remove("show-toast"); 
+            document.body.removeChild(toastDiv);
         }, 3000);
 
     });
@@ -156,12 +164,10 @@ function showReportConfirmation(tweetDiv) {
     noBtn.innerText = "No";
     noBtn.addEventListener('click', () => {
 
-        enablePageBody();
+        enablePageBody(tweetDiv);
 
         document.body.removeChild(confirmReport);
 
-        mainPage.style.pointerEvents = "auto";
-        header.style.pointerEvents = "auto";
     });
     btnContainer.appendChild(noBtn);
 
@@ -223,7 +229,7 @@ function hideTweets() {
                 return;
             }
         
-            if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains("overlay")) {
+            if (!tweetDiv.classList.contains("predicted") && !tweetDiv.parentElement.lastChild.classList.contains("overlay")) {
                 const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
                 const overlayDiv = document.createElement('div');
                 overlayDiv.style.backgroundColor = bodyColor;
@@ -231,9 +237,9 @@ function hideTweets() {
                 
                 const loader = document.createElement('div');
                 loader.classList.add("loader");
-
                 overlayDiv.appendChild(loader);
-                tweetDiv.appendChild(overlayDiv);
+
+                tweetDiv.parentElement.appendChild(overlayDiv);
                 
             }
         }
@@ -248,9 +254,10 @@ function showTweet(tweetDiv) {
         return;
     }
 
-    if (tweetDiv.lastChild.classList.contains("overlay") || tweetDiv.querySelector(".overlay")) {
-        tweetDiv.removeChild(tweetDiv.lastChild);
+    if (tweetDiv.parentElement.lastChild.classList.contains("overlay")) {
+        tweetDiv.parentElement.removeChild(tweetDiv.parentElement.lastChild);
     }
+
 }
 
 
@@ -319,23 +326,31 @@ port.onMessage.addListener((message) => {
             }
 
             // Abusive tweet? -> censor
-            if (message.prediction === "Abusive" && !tweetDiv.classList.contains("censored")) {
+            if (message.prediction === "Abusive" && !tweetDiv.querySelector(".censored")) {
                 if (toggleProfanity) {
                     censorProfanity(tweetDiv, message.profanities)
                 }
                 else {
-                    censor(tweetDiv);
+                    censorTweet(tweetDiv);
                 }
                 
             }
             // Non-Abusive but censored? -> uncensor
-            else if (message.prediction === "Non-Abusive" && tweetDiv.classList.contains("censored")) {
-                tweetDiv.classList.remove("censored");
+            else if (message.prediction === "Non-Abusive" && tweetDiv.querySelector(".censored")) {
+                
+                if (toggleProfanity) {
+                    tweetDiv.childNodes.forEach(child => {
+                        child.classList.remove("censored");
+                    });
+                }
+                else {
+                    tweetDiv.classList.remove("censored");
+                }
             }
     
             tweetDiv.classList.add("predicted");
+
             addReportButton(tweetDiv);
-            console.log(message.tweet, message.prediction);
             
         }
 
@@ -359,14 +374,14 @@ setInterval(function() {
             const tweetDiv = tweetDivs[i];
             const tweet = tweetDiv.textContent;
             const language = tweetDiv.getAttribute("lang");
- 
+
             if (tweetDiv.classList.contains("sent")) {
                 if (tweetDiv.classList.contains("predicted")) {
                     showTweet(tweetDiv);
                 }
                 continue;
             }
-
+            
             if (allowedLanguages.includes(language)) {
                 port.postMessage({ tweet : tweet, lang: language });
             }

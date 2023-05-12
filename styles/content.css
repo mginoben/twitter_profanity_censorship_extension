@@ -77,8 +77,6 @@ body.loading {
 
 .overlay {
   font-weight: normal;
-  color: #174f5c;
-  background-color:gainsboro;
   border-radius: 4px;
   display: flex;
   padding-top: 5%;
@@ -147,17 +145,18 @@ body.loading {
   color: #fff; /* White text color */
   text-align: center; /* Centered text */
   border-radius: 2px; /* Rounded borders */
-  padding: 5px; /* Padding */
+  padding: 15px; /* Padding */
   position: fixed; /* Sit on top of the screen */
   z-index: 1; /* Add a z-index if needed */
   left: 50%; /* Center the snackbar */
   bottom: 30px; /* 30px from the bottom */
   font-family: sans-serif;
   font-size: 15px;
+  border-radius: 10px;
 }
 
 /* Show the snackbar when clicking on a button (class added with JavaScript) */
-#toast.show {
+#toast.show-toast {
   visibility: visible; /* Show the snackbar */
   /* Add animation: Take 0.5 seconds to fade in and out the snackbar.
   However, delay the fade out process for 2.5 seconds */
@@ -187,7 +186,7 @@ body.loading {
 }
 
 .confirm-report {
-  background-color: #470d13;
+  background-color: #470e0e;
   color: #fff; /* White text color */
   text-align: center; /* Centered text */
   border-radius: 2px; /* Rounded borders */
@@ -202,4 +201,3 @@ body.loading {
   font-size: 15px;
   border-radius: 10px;
 }
-

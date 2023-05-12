@@ -148,6 +148,22 @@ function alertUser() {
 	);
 }
 
+function updateBadge() {
+	if (countAbusive(tweetPredictions) > 1) {
+
+		chrome.tabs.query({ url: "*://twitter.com/*" }, function(tabs) {
+
+			tabs.forEach(tab => {
+				console.log("asdd");
+				chrome.action.setBadgeText({text: countAbusive(tweetPredictions).toString(), tabId: tab.id });
+				chrome.action.setBadgeTextColor({ color: 'white', tabId: tab.id  });
+				chrome.action.setBadgeBackgroundColor({ color: "#4f4f4f", tabId: tab.id });
+			});
+
+		});
+		
+	}
+}
 
 chrome.alarms.onAlarm.addListener(
 	() => {
@@ -470,6 +486,8 @@ chrome.runtime.onConnect.addListener(function(port) {
 						});
 
 						saveTweet(true, true, message.tweet, prediction, profanities);
+
+						updateBadge();
 
 					});
 
