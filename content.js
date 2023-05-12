@@ -75,6 +75,11 @@ function censorProfanity(tweetDiv, profanities) {
 }
 
 function disablePageBody(tweetDiv) {
+
+    tweetDiv.childNodes.forEach(child => {
+        child.classList.replace("abusive", "non-abusive");
+    });
+
     // get all the child elements of the parent div
     const censoredProfanities = tweetDiv.querySelectorAll('.censored');
 
@@ -93,6 +98,11 @@ function disablePageBody(tweetDiv) {
 }
 
 function enablePageBody(tweetDiv) {
+
+    tweetDiv.childNodes.forEach(child => {
+        child.classList.replace("non-abusive", "abusive");
+    });
+    
     // get all the child elements of the parent div
     const censoredProfanities = tweetDiv.querySelectorAll('.abusive'); //TODO recensor tweet
 
@@ -123,9 +133,7 @@ function showReportConfirmation(tweetDiv) {
     const btnContainer = document.createElement("div");
     confirmReport.appendChild(btnContainer);
 
-    tweetDiv.childNodes.forEach(child => {
-        child.classList.replace("abusive", "non-abusive");
-    });
+    
     
     confirmReport.insertAdjacentHTML('afterbegin', tweetDiv.innerHTML);
     document.body.appendChild(confirmReport);
