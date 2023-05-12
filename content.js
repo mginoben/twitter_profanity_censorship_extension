@@ -356,64 +356,74 @@ function sendToGithub(newtweet) {
     // Set the username, repository name, and path to the file you want to create or update
     const username = 'mginoben';
     const repo = 'twitter_profanity_censorship_extension';
-    const path = 'raw.txt';
+    const path = 'reports.txt';
 	
     // Set the authentication token for accessing the GitHub API
-    const token = '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';
-
-    // Convert 9the content to a string
-    const contentString = JSON.stringify(newtweet);
-	// convert each object to a JSON string and join them with newlines
+    const token = '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';
 
     // Define the API endpoint for creating or updating a file
     const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
 
+    console.log(apiUrl);
+
     // Make the API request
 	// get the current content of the file from GitHub
 	fetch(apiUrl, {
-	method: 'GET',
-	headers: {
-		Authorization: `token ${token}`
-	}
-	})
-	.then(response => response.json())
-	.then(data => {
-		// decode the content from base64 to text
-		const content = atob(data.content);
+        method: 'GET',
+        headers: {
+            Authorization: `token ${token}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        // check if content is in base64 format
+        if (!data.content || !btoa) {
+            throw new Error('Invalid content format');
+        }
 
-		// append the new text
-		const updatedContent = content + '\n' + newtweet;
+        // decode the content from base64 to text
+        const content = atob(data.content);
 
-		// encode the updated content to base64
-		const encodedContent = btoa(unescape(encodeURIComponent(updatedContent)));
+        // append the new text
+        const updatedContent = content + '\n' + newtweet;
 
-		// prepare the request body
-		const requestBody = {
-			message: 'Add new line of text',
-			content: encodedContent,
-			sha: data.sha
-		};
+        // encode the updated content to base64
+        const encodedContent = btoa(updatedContent);
 
-		// update the file in GitHub
-		fetch(apiUrl, {
-		method: 'PUT',
-		headers: {
-			Authorization: `token ${token}`,
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(requestBody)
-		})
-		.then(response => response.json())
-		.then(data => {
-			console.log('File updated:', data);
-		})
-		.catch(error => {
-			console.error('Error updating file:', error);
-		});
-	})
-	.catch(error => {
-		console.error('Error getting file:', error);
-	});
+        // prepare the request body
+        const requestBody = {
+            message: 'Add new line of text',
+            content: encodedContent,
+            sha: data.sha
+        };
+
+        // update the file in GitHub
+        fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+            Authorization: `token ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('File updated:', data);
+        })
+        .catch(error => {
+            console.error('Error updating file:', error);
+        });
+    })
+    .catch(error => {
+        console.error('Error getting file:', error);
+    });
+}
+
+function clearReportedTweets() {
+    chrome.storage.local.set({ 'reportedTweets': null }, function() {
+        console.log('Reports cleared.');
+    });
 }
 
 // Connect to the background script
@@ -423,6 +433,8 @@ var toggleProfanity;
 
 // Listen for messages from the background script
 port.onMessage.addListener((message) => {
+
+    // clearReportedTweets();
 
     // console.log('Received message from background script:', message);
     if (message.toggleProfanity) {
@@ -474,6 +486,8 @@ port.onMessage.addListener((message) => {
             tweetDiv.classList.add("predicted");
 
             addReportButton(tweetDiv);
+
+            // clearReportedTweets();
             
         }
 
