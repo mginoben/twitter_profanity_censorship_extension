@@ -250,8 +250,6 @@ function addReportButton(tweetDiv) {
     // get any existing data from storage
     chrome.storage.local.get(['reportedTweets'], function(result) {
 
-        console.log(result);
-
         if (result.reportedTweets) {
             console.log(result.reportedTweets);
             // if there is existing data, append it to the list variable
@@ -355,11 +353,11 @@ function findTweetDiv(targetTweet) {
 function sendToGithub(newtweet) {
     // Set the username, repository name, and path to the file you want to create or update
     const username = 'mginoben';
-    const repo = 'twitter_profanity_censorship_extension';
-    const path = 'reports.txt';
+    const repo = 'reported-tweets';
+    const path = 'reported_tweets.txt';
 	
     // Set the authentication token for accessing the GitHub API
-    const token = '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';
+    const token = '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';
 
     // Define the API endpoint for creating or updating a file
     const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
