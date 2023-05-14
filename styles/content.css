@@ -17,32 +17,28 @@ body.loading {
   color: #cc5b5b !important;
 }
 
-.censored,
-.censored * {
+.censored {
   color: #8b8b8b !important;
   background-color: #8b8b8b !important;
   user-select: none; /* Standard syntax */
   pointer-events: none;
-  text-decoration: none !important;
-}
-
-.censored span {
-  padding: 1px;
+  content-visibility: hidden !important;
+  margin: 0px !important;
+  height: 20px !important;
 }
 
 .censored a {
+  color: #8b8b8b !important;
   text-decoration: none !important;
   cursor: default;
 }
 
-.censored-img {
-  height: 20px;
+img.censored {
   vertical-align: -20% !important;
-  margin: 0px !important;
   content-visibility: hidden !important;
 }
 
-.show span {
+.show {
   user-select: auto;
   pointer-events: auto;
   cursor:pointer;

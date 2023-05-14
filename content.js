@@ -1,4 +1,43 @@
 // Predicts tweet
+
+
+function formatUsername(usernameDiv) {
+
+    const usernameSplit = usernameDiv.innerText.split('\n');
+
+    for (let i = 0; i < usernameSplit.length; i++) {
+        const word = usernameSplit[i];
+        if (word.includes('@')) {
+            word_split = word.split('·');
+            return word_split[0].replace('@', '');
+         }
+    }
+
+}
+
+function getTweets(tweetDivs, usernameDivs) {
+
+    const information = [];
+
+    for (let i = 0; i < tweetDivs.length; i++) {
+
+        // Article has no tweet        
+        if (!tweetDivs[i]) {continue;}
+
+        const div = tweetDivs[i]
+        const text = div.textContent;
+        const language = div.getAttribute("lang");
+        const username = formatUsername(usernameDivs[i]);
+
+        const data = {text, language, username, div}
+
+        information.push(data);
+
+    }
+
+    return information;
+}
+
 function censorTweet(tweetDiv) {
 
     if (tweetDiv.classList.contains("predicted")) {
@@ -9,18 +48,18 @@ function censorTweet(tweetDiv) {
 
     console.log("Censoring...", tweetDiv.textContent);
 
-    const tweetDivChildNodes = tweetDiv.childNodes;
+    tweetDiv.childNodes.forEach(child=> {
 
-    tweetDivChildNodes.forEach(child=> {
-        if (child.tagName === "IMG") {
-            child.classList.add("censored-img");
+        // Not an overlay
+        if (!child.classList.contains("overlay")) {
+            child.classList.add("censored", "abusive");
         }
-        child.classList.add("censored", "abusive");
+        // TODO Username
     });
 
     tweetDiv.addEventListener('click', function(event) {
 
-        tweetDivChildNodes.forEach(child => {
+        tweetDiv.childNodes.forEach(child => {
             if (child.classList.contains("censored")) {
                 child.classList.remove("censored", "censored-img");
             }
@@ -209,6 +248,7 @@ function showReportConfirmation(tweetDiv) {
 
 }
 
+
 function createReportButton(tweetDiv) {
     const reportIcon = document.createElement('img');
     reportIcon.src = chrome.runtime.getURL("images/report.png");
@@ -238,82 +278,36 @@ function createReportButton(tweetDiv) {
     });
 }
 
-function addReportButton(tweetDiv) {
 
-    const reportImg = tweetDiv.parentNode.querySelector(".report-img");
-    if (reportImg) {
-        return;
-    }
-
-    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-
-    // get any existing data from storage
-    chrome.storage.local.get(['reportedTweets'], function(result) {
-
-        if (result.reportedTweets) {
-            console.log(result.reportedTweets);
-            // if there is existing data, append it to the list variable
-            reportedTweets = result.reportedTweets;
-
-            if (reportedTweets.includes(tweet)) {
-                return;
-            }
-            else {
-                createReportButton(tweetDiv);
-            }
-        }
-        else {
-            createReportButton(tweetDiv);
-        }
-
-        
-    });
-
-}
-
-
-function hideTweets() {
+function hideLoadingTweets() {
 
     setInterval(function() {
 
-        const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+        const tweetDivs = document.querySelectorAll('[data-testid="tweetText"]');
 
-        for (const tweetDiv of tweetDivs) {
+        tweetDivs.forEach(tweetDiv => {
 
-            const language = tweetDiv.getAttribute("lang");
-    
-            if (!allowedLanguages.includes(language)) {
-                return;
-            }
-        
-            if (!tweetDiv.classList.contains("predicted") && !tweetDiv.parentElement.lastChild.classList.contains("overlay")) {
-                const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
+            if (!tweetDiv.classList.contains("predicted") && !tweetDiv.lastChild.classList.contains('overlay')) {
+
                 const overlayDiv = document.createElement('div');
+                const bodyColor = window.getComputedStyle(document.body).getPropertyValue('background-color');
                 overlayDiv.style.backgroundColor = bodyColor;
                 overlayDiv.classList.add('overlay');
-                
+
                 const loader = document.createElement('div');
                 loader.classList.add("loader");
                 overlayDiv.appendChild(loader);
 
-                tweetDiv.parentElement.appendChild(overlayDiv);
-                
+                tweetDiv.appendChild(overlayDiv); 
+
             }
-        }
+            else if (tweetDiv.classList.contains("predicted") && tweetDiv.lastChild.classList.contains('overlay')) {
+                tweetDiv.removeChild(tweetDiv.lastChild);
+            }
+
+        });
 
     }, 400);
-
-}
-
-function showTweet(tweetDiv) {
-
-    if (!tweetDiv.classList.contains("predicted")) {
-        return;
-    }
-
-    if (tweetDiv.parentElement.lastChild.classList.contains("overlay")) {
-        tweetDiv.parentElement.removeChild(tweetDiv.parentElement.lastChild);
-    }
 
 }
 
@@ -329,26 +323,6 @@ function findTweet(listOfTweet, tweet) {
   
 }
 
-
-function findTweetDiv(targetTweet) {
-
-    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
-
-    for (const tweetDiv of tweetDivs) {
-
-        const language = tweetDiv.getAttribute("lang");
-
-        if (language === "en" || tweetDiv.classList.contains("predicted")) {
-            continue;
-        }
-
-        const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
-
-        if (tweet === targetTweet) {
-            return tweetDiv;
-        }
-    }
-}
 
 function sendToGithub(newtweet) {
     // Set the username, repository name, and path to the file you want to create or update
@@ -434,99 +408,78 @@ port.onMessage.addListener((message) => {
 
     // clearReportedTweets();
 
-    // console.log('Received message from background script:', message);
+    console.log('Received message from background script:', message);
+
     if (message.toggleProfanity) {
         console.log("TOGGLE", message.toggleProfanity.toggleProfanity);
         toggleProfanity =  message.toggleProfanity.toggleProfanity;
     }
 
-    if (message.tweet) {
+    if (message.text) {
 
-        const tweetDivs = [...document.querySelectorAll('[data-testid="tweet"] [lang]')]
-        .filter(div => div.textContent.includes(message.tweet));
+        const tweet = message;
+
+        const tweetDivs = [...document.querySelectorAll('[data-testid="tweetText"]')]
+        .filter(div => div.textContent.includes(tweet.text));
+
 
         for (let i = 0; i < tweetDivs.length; i++) {
+
             const tweetDiv = tweetDivs[i];
 
-            if (!tweetDiv) {
-                continue;
-            }
-
             // Pending tweet? -> send again to background script
-            if (message.prediction === "Pending" && tweetDiv.classList.contains("sent")) {
-                tweetDiv.classList.remove("sent");
+            if (tweet.prediction === "Pending") {
+                div.classList.remove('queued');
                 continue;
-            }
-
-            // Abusive tweet? -> censor
-            if (message.prediction === "Abusive" && !tweetDiv.querySelector(".censored")) {
+            } 
+            // Abusive? -> censor
+            else if (tweet.prediction === "Abusive") {
                 if (toggleProfanity) {
-                    censorProfanity(tweetDiv, message.profanities)
+                    censorProfanity(tweetDiv, tweet.profanities)
                 }
                 else {
                     censorTweet(tweetDiv);
                 }
                 
             }
-            // Non-Abusive but censored? -> uncensor
-            else if (message.prediction === "Non-Abusive" && tweetDiv.querySelector(".censored")) {
-                
-                if (toggleProfanity) {
-                    tweetDiv.childNodes.forEach(child => {
-                        child.classList.remove("censored");
-                    });
-                }
-                else {
-                    tweetDiv.classList.remove("censored");
-                }
-            }
-    
-            tweetDiv.classList.add("predicted");
 
-            addReportButton(tweetDiv);
-
-            // clearReportedTweets();
-            
+            tweetDiv.classList.add('predicted');
         }
 
     }
 
 });
 
-hideTweets();
+// Hide tweets that are not yet predicted  
+hideLoadingTweets();
 
-var allowedLanguages = ["in", "fil", "tl"];
-
-// Loop interval
+// Loop interval for getting tweets
 setInterval(function() {
 
-    const tweetDivs = document.querySelectorAll('[data-testid="tweet"] [lang]');
+    const articles = document.querySelectorAll('article[data-testid="tweet"]');
     
-    if (tweetDivs.length > 0) {
-        
-        for (let i = 0; i < tweetDivs.length; i++) {
+    if (articles.length === 0) {
+        return;
+    }
 
-            const tweetDiv = tweetDivs[i];
-            const tweet = tweetDiv.textContent;
-            const language = tweetDiv.getAttribute("lang");
+    const tweetDivs = document.querySelectorAll('[data-testid="tweetText"]');
+    const usernameDivs = document.querySelectorAll('[data-testid="User-Name"]');
 
-            if (tweetDiv.classList.contains("sent")) {
-                if (tweetDiv.classList.contains("predicted")) {
-                    showTweet(tweetDiv);
-                }
-                continue;
-            }
-            
-            if (allowedLanguages.includes(language)) {
-                port.postMessage({ tweet : tweet, lang: language });
-            }
-            else {
-                port.postMessage({ tweet : tweet, lang: "not_tl" });
-            }   
-            
-            tweetDiv.classList.add("sent");
+    const tweets = getTweets(tweetDivs, usernameDivs);
 
-        }
+    for (let i = 0; i < tweets.length; i++) {
+
+        const tweet = tweets[i];
+        const div = tweet.div;
+
+        if (div.classList.contains('queued')) { continue; }
+
+        // Delete div from post object
+        delete tweet.div;
+        port.postMessage(tweet);
+
+        // Mark tweet as sent (for prediction queuing)
+        div.classList.add('queued');
 
     }
         

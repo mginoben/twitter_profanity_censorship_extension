@@ -30,12 +30,12 @@ function computeCensoredRatio(listOfTweet) {
   return Math.round(ratio).toString();
 }
 
-function findTweet(listOfTweet, tweet) {
+function findTweet(listOfTweet, text) {
 
   for (let i = 0; i < listOfTweet.length; i++) {
-    const tweetObj = listOfTweet[i];
-    if (tweetObj.tweet === tweet) {
-      return tweetObj;
+    const tweet = listOfTweet[i];
+    if (tweet.text === text) {
+      return tweet;
     }
   }
 
@@ -117,35 +117,36 @@ function addToFeed(tweet, prediction) {
 	}
 }
 
-function saveTweet(overall, feed, tweet, prediction, profanities) {
-
-	if (overall === true && !findTweet(tweetPredictions, tweet)) {
-		console.log("Saving to overall tweets...", tweet);
-		tweetPredictions.push({ 
-			tweet: tweet, 
-			prediction: prediction,
-			profanities : profanities
-		});
-	}
-
-	if (feed === true && !findTweet(feedTweetPredictions, tweet)) {
-		console.log("Saving to feed tweets...", tweet);
-		feedTweetPredictions.push({ 
-			tweet: tweet, 
-			prediction: prediction,
-			profanities : profanities
-		});
+function saveToVisitList(tweet) {
+	
+	if (!findTweet(tweetPredictions, tweet.text)) {
+		console.log("Saving to 'since visit'...", tweet.text);
+		tweetPredictions.push(tweet);
 	}
 
 }
 
-function alertUser() {
-	chrome.alarms.create(
-		"alert_user",
-		{
-			delayInMinutes: 0
-		}
-	);
+function saveToFeedList(tweet) {
+
+	if (!findTweet(feedTweetPredictions, tweet.text)) {
+		console.log("Saving to 'feed'...", tweet.text);
+		feedTweetPredictions.push(tweet);
+	}
+
+}
+
+function alertUserListener() {
+
+	if (computeCensoredRatio(feedTweetPredictions) >= 30 && feedTweetPredictions.length >= 5 && alertNotification !== "done") {
+		chrome.alarms.create(
+			"alert_user",
+			{
+				delayInMinutes: 0
+			}
+		);
+		alertNotification = "done";
+	}
+	
 }
 
 function updateBadge() {
@@ -336,9 +337,6 @@ chrome.runtime.onConnect.addListener(function(port) {
 	  	popupPort.onMessage.addListener(function(message) {
 			console.log("Received message from popup script:", message);
 
-			if (message.alertUser) {
-				console.log(message.alertUser);
-			}
 			
 			// Toggle turned on
 			if (message.toggleState === true) {
@@ -423,6 +421,7 @@ chrome.runtime.onConnect.addListener(function(port) {
 		console.log("Content script connected");
 		// Save the port for later use
 		contentPort = port;
+		const allowedLanguages = ["in", "fil", "tl"];
 
 		chrome.storage.local.get(["toggleProfanity"], function(toggle){
 			console.log(toggle);
@@ -437,73 +436,70 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			// console.log("Received message from content script:", message);
 
-			if (message.tweet) {
+			if (message.text) {
 
-				// Show alert
-				if (computeCensoredRatio(feedTweetPredictions) >= 30 && feedTweetPredictions.length >= 5 && alertNotification !== "done") {
-					alertUser();
-					alertNotification = "done";
+				console.log(message);
+
+				// Add placeholder variable
+				const prediction = null;
+				const profanities = [];
+				const tweet = Object.assign({}, message, {prediction, profanities});
+
+				// Not Tagalog
+				if (!allowedLanguages.includes(tweet.language)) {
+
+					tweet.prediction = "Not Tagalog";
+					tweet.profanities = [];
+
+					contentPort.postMessage(tweet);
+
+					console.log(tweet);
+
+					saveToVisitList(tweet);
+					saveToFeedList(tweet);
+
+					return;
+
 				}
 
-				const foundTweet = findTweet(tweetPredictions, message.tweet);
+				const savedTweet = findTweet(tweetPredictions, tweet.text);
 
-				if (!foundTweet) {
+				// Predict Tagalog tweets not in list
+				if (!savedTweet) {
 
-					if (message.lang === "not_tl") {
+					query(tweet.text).then(result => {
 
-						const prediction = "Not Tagalog";
-						const profanities = []
-
-						contentPort.postMessage({ 
-							tweet : message.tweet,
-							prediction: prediction,
-						});
-
-						saveTweet(true, true, message.tweet, prediction, profanities);
-
-						return;
-					}
-
-					query(message.tweet).then(data => {
-
-						console.log("Predicting...", message.tweet);
+						console.log("Predicting...", tweet.text);
 		
-						if (!data) {
-							console.log("Prediction failed. Predicting again...", message.tweet);
-							contentPort.postMessage({ 
-								tweet : message.tweet,
-								prediction: "Pending"
-							});
+						if (!result) {
+							console.log("Prediction failed. Predicting again...", tweet.text);
+							tweet.prediction = "Pending";
+							contentPort.postMessage(tweet);
 							return;
 						}
 
-						console.log(message.tweet, data);
+						tweet.prediction = result[0];
+						tweet.profanities = result[1];
 
-						const prediction = data[0];
-						const profanities = data[1];
+						console.log(tweet, result);
 						
-						contentPort.postMessage({ 
-							tweet : message.tweet,
-							prediction: prediction,
-							profanities : profanities
-						});
+						contentPort.postMessage(tweet);
 
-						saveTweet(true, true, message.tweet, prediction, profanities);
+						saveToVisitList(tweet);
+						saveToFeedList(tweet);
+
+						updateBadge();
 
 					});
 
 				}
 				else {
 
-					console.log("Retrieving...", foundTweet.tweet);
+					console.log("Found on saved list...", savedTweet.text);
 
-					contentPort.postMessage({ 
-						tweet : foundTweet.tweet,
-						prediction : foundTweet.prediction,
-						profanities : foundTweet.profanities
-					});
+					contentPort.postMessage(savedTweet);
 
-					saveTweet(true, true, message.tweet, foundTweet.prediction, foundTweet.profanities);
+					saveToFeedList(savedTweet);
 
 				}
 

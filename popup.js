@@ -32,9 +32,8 @@ port.onMessage.addListener((message) => {
 
         message.tweetPredictions.forEach(tweet => {
             
-            console.log(tweet);
             const tweetLog = document.createElement('div');
-            tweetLog.textContent = tweet.tweet;
+            tweetLog.textContent = tweet.text;
             tweetLog.classList.add("tweet-log");
 
             if (tweet.prediction === "Abusive") {
