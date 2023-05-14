@@ -11,6 +11,8 @@
 
 
 body {
+    border: 2px solid #14171A;
+    height: 270px;
     margin: 0;
     padding: 0;
     color: white;
@@ -23,6 +25,7 @@ body {
 }
 
 .container {
+    height: 270px;
     font-family: "sublima";
     font-size: 13px;
     text-align: center;
@@ -34,36 +37,86 @@ body {
 
 #main-window {
     width: 125px;
-    height: 270px;
-    border: 2px solid #14171A;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-around;
 }
 
 #log-window {
-    width: 400px;
-    height: 270px;
+    height: 100%;
+    margin: 0;
+}
+
+#log-panel {
+    width: 100%;
+    height: 85%;
     overflow: scroll;
     overflow-x: hidden;
+    margin: 0;
 }
 
 .tweet-log {
-    user-select: none;
+    border: 1px solid #14171A;
+    border-radius: 5px;
     display: flex;
+    flex-direction: row;
+}
+
+.tweet-container {
+    width: 400px;
+    user-select: none;
     align-items: center;
     padding: 5px;
-    border: 1px solid #14171A;
-    text-align: start;
     color: #14171A;
+    margin: 5px;
+    text-align: start;
+    overflow-wrap: break-word;
+}
+
+.tweet-container p {
+    margin: 0;
+    width: 100%;
+}
+
+.tweet-container img {
+    height: 18px;
+    width: 18px;
+    vertical-align: -20% !important;
+    margin: 1px;
+}
+
+.tweet-container a {
+    pointer-events: none;
 }
 
 .log-title {
-    font-size: 20px;
+    margin: 0;
+    font-size: 15px;
+}
+
+.report-img {
+    width: 20px;
+    margin: 5px;
+    cursor: pointer;
+}
+
+.selected {
+    background-color: #8b8b8b !important;
+}
+
+#report-btn {
+    display: none;
+    position: absolute;
+    right: 130px;
+    top: 5px;
+    background-color: #cc5b5b;
+    color: white;
+    padding: 5px;
+    border-radius: 10px;
 }
 
 .icons-container {
-    background-color: #14171A;
     display: flex;
     justify-content: space-around;
     align-items: center;

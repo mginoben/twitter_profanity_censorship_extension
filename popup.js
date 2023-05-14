@@ -4,12 +4,14 @@ const port = chrome.runtime.connect({name: 'popup'});
 // Alert toggle
 var alertUser; 
 var alertUserFeed; 
+let reportList = [];
 
 // TODO Nofication
 
 // Listen for messages from the background script
 port.onMessage.addListener((message) => {
-    // console.log('Received message:', message);
+
+    console.log('Received message:', message);
 
     if (message.toggleState) {
         // Set button check state
@@ -31,11 +33,49 @@ port.onMessage.addListener((message) => {
         logPanel.innerHTML = '';
 
         message.tweetPredictions.forEach(tweet => {
-            
-            const tweetLog = document.createElement('div');
-            tweetLog.textContent = tweet.text;
-            tweetLog.classList.add("tweet-log");
 
+            // Tweet log
+            const tweetLog = document.createElement('div');
+            tweetLog.classList.add("tweet-log");
+            // Tweet Container
+            const tweetContainer = document.createElement('div');
+            tweetContainer.classList.add("tweet-container");
+            tweetContainer.innerHTML = tweet.html;
+            // Report Container
+            const reportContainer = document.createElement('div');
+            reportContainer.classList.add("report-container");
+            const reportIcon = document.createElement('img');
+            reportIcon.src = chrome.runtime.getURL("images/report.png");
+            reportIcon.alt = 'Mark as wrong censorship';
+            reportIcon.id = "report-img";
+            reportIcon.classList.add("report-img");
+            
+            // Report Event
+            reportIcon.addEventListener('click', (event) => {
+
+                if (!tweetLog.classList.contains('selected')) {
+                    tweetLog.classList.add('selected');
+                    reportList.push(tweetContainer.textContent);
+                }
+                else {
+                    tweetLog.classList.remove('selected');
+                    reportList = reportList.filter(item => item !== tweetContainer.textContent);
+                }
+
+                console.log(tweetContainer.textContent);
+                if (reportList.length > 0) {
+                    reportButton.style.display = "block";
+                }
+                else {
+                    reportButton.style.display = "none";
+                }
+                
+            });
+            
+            reportContainer.appendChild(reportIcon);
+            tweetLog.appendChild(tweetContainer);
+            tweetLog.appendChild(reportContainer);
+            
             if (tweet.prediction === "Abusive") {
                 tweetLog.style.backgroundColor = "#ff8a90";
             } else {
@@ -49,6 +89,7 @@ port.onMessage.addListener((message) => {
   
 });
 
+var reportButton = document.getElementById("report-btn");
 var censoredCount = document.getElementById("censoredCount");
 var censoredRatio = document.getElementById("censoredRatio");
 var feedCensoredCount = document.getElementById("feedCensoredCount");
@@ -97,6 +138,12 @@ censorToggle.addEventListener("change", function() {
 
 });
 
+reportButton.addEventListener("click", function() {
+    port.postMessage({reportList: reportList});
+    removeLogs(reportList);
+    reportList = [];
+    reportButton.style.display = "none";
+});
 
 function updatePopup(message) {
 
@@ -143,6 +190,17 @@ function updatePopup(message) {
         }
         feedCensoredResult.style.color = "#b4e092";
     }
+}
+
+function removeLogs(listOfTweet) {
+
+    listOfTweet.forEach(tweetText => {
+        const tweetDiv = [...document.querySelectorAll('.tweet-container')]
+        .filter(div => div.textContent.includes(tweetText));
+        console.log();
+        tweetDiv[0].parentElement.parentElement.removeChild(tweetDiv[0].parentElement);
+    });
+   
 }
 
 

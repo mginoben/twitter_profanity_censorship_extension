@@ -24,14 +24,15 @@ function getTweets(tweetDivs, usernameDivs) {
         // Article has no tweet        
         if (!tweetDivs[i]) {continue;}
 
-        const div = tweetDivs[i]
+        const div = tweetDivs[i];
+        const html = div.innerHTML;
         const text = div.textContent;
         const language = div.getAttribute("lang");
         const username = formatUsername(usernameDivs[i]);
 
-        const data = {text, language, username, div}
+        const tweet = {text, language, username, div, html}
 
-        information.push(data);
+        information.push(tweet);
 
     }
 
@@ -54,7 +55,7 @@ function censorTweet(tweetDiv) {
         if (!child.classList.contains("overlay")) {
             child.classList.add("censored", "abusive");
         }
-        // TODO Username
+
     });
 
     tweetDiv.addEventListener('click', function(event) {
@@ -143,7 +144,7 @@ function enablePageBody(tweetDiv) {
     });
     
     // get all the child elements of the parent div
-    const censoredProfanities = tweetDiv.querySelectorAll('.abusive'); //TODO recensor tweet
+    const censoredProfanities = tweetDiv.querySelectorAll('.abusive'); 
 
     // loop through each child element and remove the 'my-class' class
     censoredProfanities.forEach((censoredProfanity) => {
@@ -471,6 +472,8 @@ setInterval(function() {
 
         const tweet = tweets[i];
         const div = tweet.div;
+
+        console.log(tweet);
 
         if (div.classList.contains('queued')) { continue; }
 
