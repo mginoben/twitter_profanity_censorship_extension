@@ -3,7 +3,6 @@
   <head>
     <title>My Extension</title>
     <link rel="stylesheet" href="styles/popup.css">
-    <script src="test.js"></script>
   </head>
   <body>
 
@@ -49,7 +48,10 @@
             <input type="checkbox" name="" id="toggle-profanity" class="icon">
           </div>
           <div title="Prediction Log">
-            <a id="toggle-log"><img src="images/log.png" class="icon"></a>
+            <a id="toggle-tweet-log"><img src="images/log.png" class="icon"></a>
+          </div>
+          <div title="Users Log">
+            <a id="toggle-user-log"><img src="images/user.png" class="icon-user"></a>
           </div>
           <div title="About the Extension">
             <a href="about.html"><img src="images/about.png" class="icon"></a>
@@ -62,6 +64,11 @@
         <input type="button" value="Report" id="report-btn">
         <span class="title log-title">Tweet Predictions Log</span>
         <div id="log-panel"></div>
+      </div>
+
+      <div id="user-window" class="hidden">
+        <span class="title log-title">Users Abusive Profanity Frequency</span>
+        <div id="users-panel"></div>
       </div>
       
 

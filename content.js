@@ -177,7 +177,7 @@ function saveReportedTweet(tweet) {
 
         // save the updated list to storage
         chrome.storage.local.set({ 'reportedTweets': reportedTweets }, function() {
-            console.log('Data saved to storage.');
+            console.log('Data saved to reported tweets.');
         });
     });
 
@@ -215,8 +215,6 @@ function showReportConfirmation(tweetDiv) {
 
         saveReportedTweet(tweet);
 
-        sendToGithub(tweet);
-
         // Toast if yes button
         const toast = document.createElement("div");
         toast.id = "toast";
@@ -251,32 +249,18 @@ function showReportConfirmation(tweetDiv) {
 
 
 function createReportButton(tweetDiv) {
+
+    tweetDiv.classList.add('reported');
+
     const reportIcon = document.createElement('img');
     reportIcon.src = chrome.runtime.getURL("images/report.png");
-    reportIcon.alt = 'Mark as wrong censorship';
+    reportIcon.alt = 'Report icon';
+    reportIcon.title = 'This tweet was reported for wrong prediction';
     reportIcon.id = "report-img";
     reportIcon.classList.add("report-img");
     parent = tweetDiv.parentNode;
-
     // Append button as tweet siblings
     tweetDiv.insertAdjacentElement('afterend', reportIcon);
-    
-    // Show button on tweet div hover
-    parent.addEventListener("mouseover", () => {
-        reportIcon.style.display = "block";
-    });
-    
-    parent.addEventListener("mouseout", () => {
-        reportIcon.style.display = "none";
-    });
-
-    // Button listener
-    reportIcon.addEventListener('click', (event) => {
-        event.stopPropagation();
-        
-        showReportConfirmation(tweetDiv);
-        
-    });
 }
 
 
@@ -325,79 +309,6 @@ function findTweet(listOfTweet, tweet) {
 }
 
 
-function sendToGithub(newtweet) {
-    // Set the username, repository name, and path to the file you want to create or update
-    const username = 'mginoben';
-    const repo = 'reported-tweets';
-    const path = 'reported_tweets.txt';
-	
-    // Set the authentication token for accessing the GitHub API
-    const token = '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';
-
-    // Define the API endpoint for creating or updating a file
-    const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
-
-    console.log(apiUrl);
-
-    // Make the API request
-	// get the current content of the file from GitHub
-	fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-            Authorization: `token ${token}`
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log(data);
-        // check if content is in base64 format
-        if (!data.content || !btoa) {
-            throw new Error('Invalid content format');
-        }
-
-        // decode the content from base64 to text
-        const content = atob(data.content);
-
-        // append the new text
-        const updatedContent = content + '\n' + newtweet;
-
-        // encode the updated content to base64
-        const encodedContent = btoa(updatedContent);
-
-        // prepare the request body
-        const requestBody = {
-            message: 'Add new line of text',
-            content: encodedContent,
-            sha: data.sha
-        };
-
-        // update the file in GitHub
-        fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-            Authorization: `token ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('File updated:', data);
-        })
-        .catch(error => {
-            console.error('Error updating file:', error);
-        });
-    })
-    .catch(error => {
-        console.error('Error getting file:', error);
-    });
-}
-
-function clearReportedTweets() {
-    chrome.storage.local.set({ 'reportedTweets': null }, function() {
-        console.log('Reports cleared.');
-    });
-}
 
 // Connect to the background script
 
@@ -423,14 +334,13 @@ port.onMessage.addListener((message) => {
         const tweetDivs = [...document.querySelectorAll('[data-testid="tweetText"]')]
         .filter(div => div.textContent.includes(tweet.text));
 
-
         for (let i = 0; i < tweetDivs.length; i++) {
 
             const tweetDiv = tweetDivs[i];
 
             // Pending tweet? -> send again to background script
             if (tweet.prediction === "Pending") {
-                div.classList.remove('queued');
+                tweetDiv.classList.remove('queued');
                 continue;
             } 
             // Abusive? -> censor
@@ -443,6 +353,10 @@ port.onMessage.addListener((message) => {
                 }
                 
             }
+            
+            if (tweet.reported === true) {
+                createReportButton(tweetDiv);
+            }
 
             tweetDiv.classList.add('predicted');
         }
@@ -450,6 +364,39 @@ port.onMessage.addListener((message) => {
     }
 
 });
+
+function addReportButton(tweetDiv) {
+
+    const reportImg = tweetDiv.parentNode.querySelector(".report-img");
+
+    if (reportImg) {
+        return;
+    }
+
+    const tweet = tweetDiv.innerText.replace(/[\r\n]/gm, ' ');
+
+    // get any existing data from storage
+    chrome.storage.local.get(['reportedTweets'], function(result) {
+
+        if (result.reportedTweets) {
+            console.log(result.reportedTweets);
+            // if there is existing data, append it to the list variable
+            reportedTweets = result.reportedTweets;
+
+            if (reportedTweets.includes(tweet)) {
+                return;
+            }
+            else {
+                createReportButton(tweetDiv);
+            }
+        }
+        else {
+            createReportButton(tweetDiv);
+        }
+        
+    });
+
+}
 
 // Hide tweets that are not yet predicted  
 hideLoadingTweets();
@@ -472,8 +419,6 @@ setInterval(function() {
 
         const tweet = tweets[i];
         const div = tweet.div;
-
-        console.log(tweet);
 
         if (div.classList.contains('queued')) { continue; }
 

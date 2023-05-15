@@ -4,7 +4,8 @@ const port = chrome.runtime.connect({name: 'popup'});
 // Alert toggle
 var alertUser; 
 var alertUserFeed; 
-let reportList = [];
+let currentReportedTweets = [];
+let tweetPredictions = [];
 
 // TODO Nofication
 
@@ -31,8 +32,11 @@ port.onMessage.addListener((message) => {
     if (message.tweetPredictions) {
 
         logPanel.innerHTML = '';
+        usersPanel.innerHTML = '';
 
-        message.tweetPredictions.forEach(tweet => {
+        tweetPredictions = message.tweetPredictions;
+
+        tweetPredictions.forEach(tweet => {
 
             // Tweet log
             const tweetLog = document.createElement('div');
@@ -55,15 +59,15 @@ port.onMessage.addListener((message) => {
 
                 if (!tweetLog.classList.contains('selected')) {
                     tweetLog.classList.add('selected');
-                    reportList.push(tweetContainer.textContent);
+                    currentReportedTweets.push(getTweet(tweetContainer.textContent));
                 }
                 else {
                     tweetLog.classList.remove('selected');
-                    reportList = reportList.filter(item => item !== tweetContainer.textContent);
+                    currentReportedTweets = currentReportedTweets.filter(item => item.text !== tweetContainer.textContent);
                 }
 
                 console.log(tweetContainer.textContent);
-                if (reportList.length > 0) {
+                if (currentReportedTweets.length > 0) {
                     reportButton.style.display = "block";
                 }
                 else {
@@ -83,6 +87,37 @@ port.onMessage.addListener((message) => {
             }
 
             logPanel.appendChild(tweetLog);
+            
+        });
+
+        const usersProfanityFrequency = countAbusiveUsers(tweetPredictions);
+
+        usersProfanityFrequency.forEach(data => {
+            const userLog = document.createElement('div');
+            userLog.classList.add("user-log");
+
+            const link = document.createElement('a');
+            link.href = 'https://www.twitter.com/' + data.username;
+
+            link.addEventListener('click', () => {
+                // Get the URL of the link
+                const url = link.href;
+              
+                // Send a message to the background script
+                chrome.runtime.sendMessage({ type: 'openTab', url });
+            });
+
+            userLog.appendChild(link);
+
+            const usernameDiv = document.createElement('div');
+            const countDiv = document.createElement('div');
+            usernameDiv.textContent = data.username;
+            countDiv.textContent = data.count;
+
+            link.appendChild(usernameDiv);
+            link.appendChild(countDiv);
+
+            usersPanel.appendChild(userLog);
         });
         
     }
@@ -98,8 +133,11 @@ var censoredResult = document.getElementById("censoredResult");
 var feedCensoredResult = document.getElementById("feedCensoredResult");
 var censorToggle = document.getElementById("censorToggle");
 var logPanel = document.getElementById("log-panel");
+var usersPanel = document.getElementById("users-panel");
 var logWindow = document.getElementById("log-window");
-var toggleLog = document.getElementById("toggle-log");
+var userWindow = document.getElementById("user-window");
+var toggleTweetLog = document.getElementById("toggle-tweet-log");
+var toggleUserLog = document.getElementById("toggle-user-log");
 var toggleProfanity = document.getElementById("toggle-profanity");
 
 toggleProfanity.addEventListener("change", function() {
@@ -113,7 +151,7 @@ toggleProfanity.addEventListener("change", function() {
   
 });
 
-toggleLog.addEventListener("click", function() {
+toggleTweetLog.addEventListener("click", function() {
 
     if (logWindow.classList.contains("hidden")) {
         logWindow.classList.remove("hidden");
@@ -121,8 +159,26 @@ toggleLog.addEventListener("click", function() {
     else {
         logWindow.classList.add("hidden");
     }
+
+    if (!userWindow.classList.contains("hidden")) {
+        userWindow.classList.add("hidden");
+    }
+
+});
+
+toggleUserLog.addEventListener("click", function() {
+
+    if (userWindow.classList.contains("hidden")) {
+        userWindow.classList.remove("hidden");
+    }
+    else {
+        userWindow.classList.add("hidden");
+    }
+
+    if (!logWindow.classList.contains("hidden")) {
+        logWindow.classList.add("hidden");
+    }
     
-  
 });
 
 censorToggle.addEventListener("change", function() {
@@ -139,9 +195,12 @@ censorToggle.addEventListener("change", function() {
 });
 
 reportButton.addEventListener("click", function() {
-    port.postMessage({reportList: reportList});
-    removeLogs(reportList);
-    reportList = [];
+    port.postMessage({currentReportedTweets: currentReportedTweets});
+    removeLogs(currentReportedTweets);
+
+    sendToGithub(currentReportedTweets);
+
+    currentReportedTweets = [];
     reportButton.style.display = "none";
 });
 
@@ -152,7 +211,7 @@ function updatePopup(message) {
     censoredRatio.textContent = message.censoredRatio;
     censoredCount.textContent = message.censoredCount;
 
-    if (message.censoredRatio >= 30 && message.tweetCount >= 5) {
+    if (message.censoredRatio >= 30) {
         if (alertUser !== true) {
             port.postMessage({alertUser: "overall_browsing"});
             alertUser = true;
@@ -162,6 +221,7 @@ function updatePopup(message) {
     else if (message.tweetCount == 0 && message.censoredCount == 0) {
         censoredRatio.textContent = 0;
         censoredCount.textContent = 0;
+        censoredResult.style.color = "white";
     }
     else {
         if (alertUser !== false) {
@@ -171,7 +231,7 @@ function updatePopup(message) {
         censoredResult.style.color = "#b4e092";
     }
 
-    if (message.feedCensoredRatio >= 30 && message.feedTweetCount >= 5) {
+    if (message.feedCensoredRatio >= 30) {
         if (alertUserFeed !== true) {
             console.log("Abusive Timeline");
             port.postMessage({alertUser: "feed"});
@@ -182,6 +242,7 @@ function updatePopup(message) {
     else if (message.feedTweetCount == 0 && message.feedCensoredCount == 0) {
         feedCensoredRatio.textContent = 0;
         feedCensoredCount.textContent = 0;
+        feedCensoredResult.style.color = "white";
     }
     else {
         if (alertUserFeed !== false) {
@@ -192,19 +253,140 @@ function updatePopup(message) {
     }
 }
 
-function removeLogs(listOfTweet) {
+function removeLogs(currentReportedTweets) {
 
-    listOfTweet.forEach(tweetText => {
+    currentReportedTweets.forEach(tweet => {
         const tweetDiv = [...document.querySelectorAll('.tweet-container')]
-        .filter(div => div.textContent.includes(tweetText));
+        .filter(div => div.textContent.includes(tweet.text));
         console.log();
-        tweetDiv[0].parentElement.parentElement.removeChild(tweetDiv[0].parentElement);
+        if (tweetDiv[0]) {
+            tweetDiv[0].parentElement.parentElement.removeChild(tweetDiv[0].parentElement);
+        }
     });
    
 }
 
+function getTweet(text) {
+    for (const tweet of tweetPredictions) {
+        if (tweet.text === text) {
+            return tweet;
+        }
+    }
+}
 
+function sendToGithub(newTweets) {
+    
+    let newContent = "";
+    newTweets.forEach(newTweet => {
+        delete newTweet.html;
+        delete newTweet.username;
+        delete newTweet.reported;
+        newContent += JSON.stringify(newTweet) + '\n';
+    });
 
+    // Set the username, repository name, and path to the file you want to create or update
+    const username = 'mginoben';
+    const repo = 'reported-tweets';
+    const path = 'reported_tweets.txt';
+	
+    // Set the authentication token for accessing the GitHub API
+    const token = '[ENTER TOKEN HERE]';
 
+    // Define the API endpoint for creating or updating a file
+    const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
 
+    console.log(apiUrl);
+
+	// get the current content of the file from GitHub
+	fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+            Authorization: `token ${token}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        // check if content is in base64 format
+        if (!data.content || !btoa) {
+            throw new Error('Invalid content format');
+        }
+
+        // decode the content from base64 to text
+        const content = atob(data.content);
+
+        // append the new text
+        const updatedContent = content + '\n' + newContent;
+
+        // encode the updated content to base64
+        const encodedContent = btoa(updatedContent);
+
+        // prepare the request body
+        const requestBody = {
+            message: 'Add new line of text',
+            content: encodedContent,
+            sha: data.sha
+        };
+
+        // update the file in GitHub
+        fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+            Authorization: `token ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('File updated:', data);
+        })
+        .catch(error => {
+            console.error('Error updating file:', error);
+        });
+    })
+    .catch(error => {
+        console.error('Error getting file:', error);
+    });
+}
+
+function countAbusiveUsers(tweetPredictions) {
+    // Abusive Users
+    const counts = tweetPredictions.reduce((counts, tweet) => {
+
+        const username = tweet.username;
+
+        if (tweet.prediction === "Abusive") {
+            if (username in counts) {
+                counts[username]++;
+              } else {
+                counts[username] = 1;
+              }
+        }
+
+        return counts;
+        
+    }, {});
+
+    const output = Object.entries(counts)
+    .sort(([, a], [, b]) => b - a);
+
+    let result = [];
+
+    const maxCount = 5;
+
+    for (let i = 0; i < output.length; i++) {
+        const log = output[i];
+        const username = log[0];
+        const count = log[1];
+
+        result.push({username , count});
+
+        if (i + 1 === maxCount) {
+            break;
+        }
+    }
+
+    return result;
+}
 

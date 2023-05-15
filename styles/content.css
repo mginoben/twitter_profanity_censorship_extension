@@ -108,11 +108,14 @@ img.censored {
 }
 
 .report-img {
-  display: none;
-  width: 25px;
+  width: 20px;
   align-self: flex-end;
   position: absolute;
   z-index: 1;
+}
+
+.reported {
+  padding-right: 30px !important;
 }
 
 .loader {

@@ -1,6 +1,6 @@
 let tweetPredictions = [];
 let feedTweetPredictions = [];
-let reportedTweets = [];
+let currentReportedTweets = [];
 let toggleState;
 let tweetCount;
 let censoredRatio;
@@ -166,7 +166,82 @@ function updateBadge() {
 	}
 }
 
+function saveReportedTweet(currentReportedTweets) {
+	// get any existing data from storage
+    chrome.storage.local.get(['reportedTweets'], function(result) {
 
+        // initialize an empty list
+        let reportedTweets = [];
+
+        if (result.reportedTweets) {
+            // if there is existing data, append it to the list variable
+            reportedTweets = result.reportedTweets;
+        }
+        
+        // append the new data to the list
+		currentReportedTweets.forEach(reportedTweet => {
+			reportedTweets.push(reportedTweet);
+		});
+    
+        // save the updated list to storage
+        chrome.storage.local.set({ 'reportedTweets': reportedTweets }, function() {
+            console.log('Data saved to reported tweets.');
+        });
+
+    });
+	
+}
+
+function checkIfReported(result, tweet) {
+	// initialize an empty list
+	let reportedTweets = [];
+					
+	if (result.reportedTweets) {
+		reportedTweets = result.reportedTweets;
+	}
+
+	let reportedTweet = findTweet(reportedTweets, tweet.text);
+
+	if (reportedTweet) {
+		console.log("Found reported", reportedTweet);
+		reportedTweet.reported = true;
+		return reportedTweet;
+	}
+	else {
+		tweet.reported = false;
+		return tweet;
+	}
+}
+
+function checkLanguage(tweet) {
+
+	const allowedLanguages = ["in", "fil", "tl"];
+
+	if (allowedLanguages.includes(tweet.language)) {
+		tweet.language = "tl";
+	}
+
+	return tweet;
+}
+
+function removeTweet (text) {
+	tweetPredictions = tweetPredictions.filter(tweet => tweet.text !== text);
+}
+
+
+function clearReportedTweets() {
+    chrome.storage.local.set({ 'reportedTweets': null }, function() {
+        console.log('Reports cleared.');
+    });
+}
+
+// Listen for messages from the popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	if (message.type === 'openTab') {
+	  // Open a new tab with the URL from the popup
+	  chrome.tabs.create({ url: message.url });
+	}
+});
 
 
 chrome.alarms.onAlarm.addListener(
@@ -187,36 +262,6 @@ chrome.alarms.onAlarm.addListener(
 )
 
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-
-	if (message.action === "get_reported") {
-		sendResponse({ reportedTweets: reportedTweets });
-	}
-
-	if (message.action === "report") {
-		console.log("Reported:", message.tweet);
-		reportedTweets.push(message.tweet);
-	}
-
-	if (message.status === "loading") {
-
-		chrome.action.setPopup({popup: ""});
-
-		chrome.action.setBadgeText({text: "load", tabId: sender.tab.id });
-		chrome.action.setBadgeTextColor({ color: 'white', tabId: sender.tab.id  });
-		chrome.action.setBadgeBackgroundColor({ color: "#8b0000", tabId: sender.tab.id });
-		chrome.action.setPopup({popup: ""});
-	}
-
-	if (message.status === "running") {
-
-		// Set popup
-		chrome.action.setPopup({popup: "popup.html"});
-
-	}
-
-});
-
 // Disables popup html on other websites
 chrome.tabs.onActivated.addListener(function(activeInfo) {
 
@@ -234,6 +279,8 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 // Connect to the popup script
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+
+	clearReportedTweets();
 
     if (changeInfo.status == "complete" && tab.url.includes("https://twitter.com/")) {
 
@@ -306,16 +353,7 @@ chrome.runtime.onConnect.addListener(function(port) {
 						tweetsLength = tweetPredictions.length;
 					}
 					
-					popupPort.postMessage({ 
-						popup: "update",
-						tweetCount: tweetPredictions.length,
-						censoredCount: countAbusive(tweetPredictions), 
-						censoredRatio: computeCensoredRatio(tweetPredictions),
-						feedTweetCount: feedTweetPredictions.length,
-						feedCensoredCount: countAbusive(feedTweetPredictions),
-						feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
-						toggleState: toggleState
-					});
+					updatePopup(popupPort);
 
 				}, 1000);
 			}
@@ -406,6 +444,27 @@ chrome.runtime.onConnect.addListener(function(port) {
 
 			}
 
+			if (message.currentReportedTweets) {
+				currentReportedTweets = message.currentReportedTweets;
+				currentReportedTweets.forEach(reportedTweet => { 
+					tweetPredictions = tweetPredictions.filter(tweet => tweet.text !== reportedTweet.text);
+					feedTweetPredictions = feedTweetPredictions.filter(tweet => tweet.text !== reportedTweet.text);
+					
+				});
+				saveReportedTweet(currentReportedTweets);
+				currentReportedTweets = [];
+
+				updatePopup(popupPort);
+
+				// Reload all twitter page
+				chrome.tabs.query({ url: "*://twitter.com/*" }, function(tabs) {
+					console.log(tabs);
+					for (var i = 0; i < tabs.length; i++) {
+						chrome.tabs.reload(tabs[i].id);
+					}
+				});
+			}
+
 	  	});
 	  
 	  // Handle disconnections
@@ -421,7 +480,6 @@ chrome.runtime.onConnect.addListener(function(port) {
 		console.log("Content script connected");
 		// Save the port for later use
 		contentPort = port;
-		const allowedLanguages = ["in", "fil", "tl"];
 
 		chrome.storage.local.get(["toggleProfanity"], function(toggle){
 			console.log(toggle);
@@ -434,80 +492,78 @@ chrome.runtime.onConnect.addListener(function(port) {
 		// Listen for messages from the popup script
 		contentPort.onMessage.addListener(function(message) {
 
-			// console.log("Received message from content script:", message);
+			console.log("Received message from content script:", message);
 
 			if (message.text) {
+				
+				// get reported tweets from storage
+				chrome.storage.local.get(['reportedTweets'], function(result) { 
 
-				console.log(message);
+					// Add placeholder variable
+					const prediction = null;
+					const profanities = [];
+					let tweet = Object.assign({}, message, {prediction, profanities});
 
-				// Add placeholder variable
-				const prediction = null;
-				const profanities = [];
-				const tweet = Object.assign({}, message, {prediction, profanities});
-
-				// Not Tagalog
-				if (!allowedLanguages.includes(tweet.language)) {
-
-					tweet.prediction = "Not Tagalog";
-					tweet.profanities = [];
-
-					contentPort.postMessage(tweet);
-
-					console.log(tweet);
-
-					saveToVisitList(tweet);
-					saveToFeedList(tweet);
-
-					return;
-
-				}
-
-				const savedTweet = findTweet(tweetPredictions, tweet.text);
-
-				// Predict Tagalog tweets not in list
-				if (!savedTweet) {
-
-					query(tweet.text).then(result => {
-
-						console.log("Predicting...", tweet.text);
-		
-						if (!result) {
-							console.log("Prediction failed. Predicting again...", tweet.text);
-							tweet.prediction = "Pending";
-							contentPort.postMessage(tweet);
-							return;
-						}
-
-						tweet.prediction = result[0];
-						tweet.profanities = result[1];
-
-						console.log(tweet, result);
-						
+					if (tweet.text.length === 0) {
+						tweet.prediction === "No Text";
 						contentPort.postMessage(tweet);
+						return;
+					}
 
+					tweet = checkIfReported(result, tweet);
+					if (tweet.reported === true) {
+						contentPort.postMessage(tweet);
+						return;
+					}
+					
+					// Check language
+					tweet = checkLanguage(tweet);
+					if (tweet.language !== "tl") {
+						contentPort.postMessage(tweet);
 						saveToVisitList(tweet);
 						saveToFeedList(tweet);
+						return;
+					}
 
-						updateBadge();
+					// Predict Tagalog tweets not in list
+					const savedTweet = findTweet(tweetPredictions, tweet.text);
 
-					});
+					// If not reported then predict
+					if (!savedTweet) {
+	
+						query(tweet.text).then(result => {
 
-				}
-				else {
+							console.log("Predicting...", tweet.text);
 
-					console.log("Found on saved list...", savedTweet.text);
+							if (!result) {
+								console.log("Prediction failed. Predicting again...", tweet.text);
+								tweet.prediction = "Pending";
+								contentPort.postMessage(tweet);
+								return;
+							}
 
-					contentPort.postMessage(savedTweet);
+							tweet.prediction = result[0];
+							tweet.profanities = result[1];
 
-					saveToFeedList(savedTweet);
+							saveToVisitList(tweet);
+							saveToFeedList(tweet);
 
-				}
+							updateBadge();
 
-			}
+							contentPort.postMessage(tweet);
 
-			if (message.action === "report") {
-				console.log(message);
-				sendToGithub(message.reportedTweet);
+						});
+
+					}
+					else {
+
+						contentPort.postMessage(savedTweet);
+						saveToFeedList(savedTweet);
+
+					}
+
+				});
+
 			}
 
 		});
