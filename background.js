@@ -1,3 +1,6 @@
+// BACKGROUND SCRIPT
+// Manages functions and predictions of tweets
+
 let tweetPredictions = [];
 let feedTweetPredictions = [];
 let currentReportedTweets = [];
@@ -11,6 +14,39 @@ let feedCensoredRatio;
 let port = null;
 let alertNotification = null;
 
+// Fetch API - model prediction query
+async function query(tweet) {
+	
+	const expectedOutputs = ["Abusive", "Non-Abusive", "No Profanity"]
+    try {
+		const response = await fetch("https://mginoben-tagalog-profanity-classification.hf.space/run/predict", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				data: [
+					tweet,
+				]
+			})
+		});
+
+        if (response.ok) {
+
+			const result = await response.json();
+			const data = result["data"];
+
+			if (expectedOutputs.includes(data[0])) {
+				return data;
+			}
+
+        } else {
+            console.log("Loading model please wait...");
+            // console.log(`HTTP Response Code:`, response.status);
+        }
+    } catch (error) {
+		console.log("Query error:", error);
+    }
+        
+}
 
 function computeCensoredRatio(listOfTweet) {
   let abusiveCount = 0;
@@ -53,48 +89,6 @@ function countAbusive(listOfTweet) {
   return count;
 }
 
-function sendMessage(message) {
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    var tab = tabs[0];
-    if (tab && tab.url.match('https:\/\/twitter.com\/.*')) {
-      chrome.tabs.sendMessage(tab.id, message);
-    }
-  });
-}
-
-async function query(tweet) {
-	
-	const expectedOutputs = ["Abusive", "Non-Abusive", "No Profanity"]
-    try {
-		const response = await fetch("https://mginoben-tagalog-profanity-classification.hf.space/run/predict", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				data: [
-					tweet,
-				]
-			})
-		});
-
-        if (response.ok) {
-
-			const result = await response.json();
-			const data = result["data"];
-
-			if (expectedOutputs.includes(data[0])) {
-				return data;
-			}
-
-        } else {
-            console.log("Loading model please wait...");
-            // console.log(`HTTP Response Code:`, response.status);
-        }
-    } catch (error) {
-		console.log("Query error:", error);
-    }
-        
-}
-
 function updatePopup(port) {
 	port.postMessage({ 
 		popup: "update",
@@ -106,15 +100,6 @@ function updatePopup(port) {
 		feedCensoredRatio: computeCensoredRatio(feedTweetPredictions),
 		toggleState: toggleState
 	});
-}
-
-function addToFeed(tweet, prediction) {
-	if (!findTweet(feedTweetPredictions, tweet)) {
-		feedTweetPredictions.push({
-			tweet: tweet, 
-			prediction: prediction
-		});
-	}
 }
 
 function saveToVisitList(tweet) {
@@ -133,20 +118,6 @@ function saveToFeedList(tweet) {
 		feedTweetPredictions.push(tweet);
 	}
 
-}
-
-function alertUserListener() {
-
-	if (computeCensoredRatio(feedTweetPredictions) >= 30 && feedTweetPredictions.length >= 5 && alertNotification !== "done") {
-		chrome.alarms.create(
-			"alert_user",
-			{
-				delayInMinutes: 0
-			}
-		);
-		alertNotification = "done";
-	}
-	
 }
 
 function updateBadge() {
@@ -224,24 +195,13 @@ function checkLanguage(tweet) {
 	return tweet;
 }
 
-function removeTweet (text) {
-	tweetPredictions = tweetPredictions.filter(tweet => tweet.text !== text);
-}
-
-
-function clearReportedTweets() {
-    chrome.storage.local.set({ 'reportedTweets': null }, function() {
-        console.log('Reports cleared.');
-    });
-}
-
-// Listen for messages from the popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-	if (message.type === 'openTab') {
-	  // Open a new tab with the URL from the popup
-	  chrome.tabs.create({ url: message.url });
-	}
-});
+// // Listen for messages from the popup
+// chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+// 	if (message.type === 'openTab') {
+// 	  // Open a new tab with the URL from the popup
+// 	  chrome.tabs.create({ url: message.url });
+// 	}
+// });
 
 
 chrome.alarms.onAlarm.addListener(
@@ -279,8 +239,6 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 // Connect to the popup script
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-
-	clearReportedTweets();
 
     if (changeInfo.status == "complete" && tab.url.includes("https://twitter.com/")) {
 
@@ -463,6 +421,10 @@ chrome.runtime.onConnect.addListener(function(port) {
 						chrome.tabs.reload(tabs[i].id);
 					}
 				});
+			}
+
+			if (message.newTabURL) {
+				chrome.tabs.create({ url: message.newTabURL });
 			}
 
 	  	});

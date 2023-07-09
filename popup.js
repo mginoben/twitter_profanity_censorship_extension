@@ -1,41 +1,40 @@
-// Connect to the background script
+// POPUP SCRIPT
+// Manages the extension popup html
+
+// Port connection from Background script
 const port = chrome.runtime.connect({name: 'popup'});
 
-// Alert toggle
-var alertUser; 
-var alertUserFeed; 
-let currentReportedTweets = [];
-let tweetPredictions = [];
-
-// TODO Nofication
-
-// Listen for messages from the background script
+// Messages from Background Script
 port.onMessage.addListener((message) => {
 
     console.log('Received message:', message);
 
+    // On Off Button
     if (message.toggleState) {
         // Set button check state
         censorToggle.checked = message.toggleState;
     }
 
+    // Censors only profanity or whole tweet
     if (message.toggleProfanity) {
         // Set button profanity check state
         toggleProfanity.checked = message.toggleProfanity;
     }
 
+    // Updates popup values
     if (message.popup) {
         updatePopup(message);
     }
 
-    // Tweets Logging
+    // Populate tweet logs
     if (message.tweetPredictions) {
 
+        // INIT logs and users panels
         logPanel.innerHTML = '';
         usersPanel.innerHTML = '';
 
+        // Populate Tweets Prediction List
         tweetPredictions = message.tweetPredictions;
-
         tweetPredictions.forEach(tweet => {
 
             // Tweet log
@@ -90,8 +89,8 @@ port.onMessage.addListener((message) => {
             
         });
 
+        // Populate Users Profanity Frequency List
         const usersProfanityFrequency = countAbusiveUsers(tweetPredictions);
-
         usersProfanityFrequency.forEach(data => {
             const userLog = document.createElement('div');
             userLog.classList.add("user-log");
@@ -104,7 +103,8 @@ port.onMessage.addListener((message) => {
                 const url = link.href;
               
                 // Send a message to the background script
-                chrome.runtime.sendMessage({ type: 'openTab', url });
+                // chrome.runtime.sendMessage({ type: 'openTab', url });
+                port.postMessage({newTabURL: url})
             });
 
             userLog.appendChild(link);
@@ -124,6 +124,13 @@ port.onMessage.addListener((message) => {
   
 });
 
+// Global Variables
+var alertUser; 
+var alertUserFeed; 
+let currentReportedTweets = [];
+let tweetPredictions = [];
+
+// DOMS
 var reportButton = document.getElementById("report-btn");
 var censoredCount = document.getElementById("censoredCount");
 var censoredRatio = document.getElementById("censoredRatio");
@@ -140,6 +147,9 @@ var toggleTweetLog = document.getElementById("toggle-tweet-log");
 var toggleUserLog = document.getElementById("toggle-user-log");
 var toggleProfanity = document.getElementById("toggle-profanity");
 
+// BUTTON BEHAVIORS
+
+// Toggles profanity/whole tweet censoring
 toggleProfanity.addEventListener("change", function() {
   
     if (this.checked) {
@@ -151,6 +161,7 @@ toggleProfanity.addEventListener("change", function() {
   
 });
 
+// Shows/Hide predicted tweets log
 toggleTweetLog.addEventListener("click", function() {
 
     if (logWindow.classList.contains("hidden")) {
@@ -166,6 +177,7 @@ toggleTweetLog.addEventListener("click", function() {
 
 });
 
+// Shows/Hide profanity users log
 toggleUserLog.addEventListener("click", function() {
 
     if (userWindow.classList.contains("hidden")) {
@@ -181,29 +193,35 @@ toggleUserLog.addEventListener("click", function() {
     
 });
 
+// On/Off censoring
 censorToggle.addEventListener("change", function() {
 
   window.close();
 
   if (this.checked) {
-    console.log("Checkbox is checked.");
+    console.log("Censoring...");
     port.postMessage({toggleState: true});
   } else {
+    console.log("Not censoring...");
     port.postMessage({toggleState: false});
   }
 
 });
 
+// Report selected tweet/s
 reportButton.addEventListener("click", function() {
     port.postMessage({currentReportedTweets: currentReportedTweets});
     removeLogs(currentReportedTweets);
 
-    sendToGithub(currentReportedTweets);
+    sendToGithub(currentReportedTweets, "TOKEN"); // INSERT GITHUB TOKEN HERE
 
     currentReportedTweets = [];
     reportButton.style.display = "none";
 });
 
+// FUNCTIONS
+
+// Updates popup values
 function updatePopup(message) {
 
     feedCensoredRatio.textContent = message.feedCensoredRatio;
@@ -253,6 +271,7 @@ function updatePopup(message) {
     }
 }
 
+// Remove reported tweets on tweet predictions log
 function removeLogs(currentReportedTweets) {
 
     currentReportedTweets.forEach(tweet => {
@@ -266,6 +285,7 @@ function removeLogs(currentReportedTweets) {
    
 }
 
+// Extract tweet from tweet predictions
 function getTweet(text) {
     for (const tweet of tweetPredictions) {
         if (tweet.text === text) {
@@ -274,7 +294,8 @@ function getTweet(text) {
     }
 }
 
-function sendToGithub(newTweets) {
+// Sends reported tweet to github
+function sendToGithub(newTweets, token) {
     
     let newContent = "";
     newTweets.forEach(newTweet => {
@@ -288,9 +309,6 @@ function sendToGithub(newTweets) {
     const username = 'mginoben';
     const repo = 'reported-tweets';
     const path = 'reported_tweets.txt';
-	
-    // Set the authentication token for accessing the GitHub API
-    const token = '[ENTER TOKEN HERE]';
 
     // Define the API endpoint for creating or updating a file
     const apiUrl = `https://api.github.com/repos/${username}/${repo}/contents/${path}`;
@@ -350,6 +368,7 @@ function sendToGithub(newTweets) {
     });
 }
 
+// Count abusive profanity users
 function countAbusiveUsers(tweetPredictions) {
     // Abusive Users
     const counts = tweetPredictions.reduce((counts, tweet) => {
@@ -389,4 +408,3 @@ function countAbusiveUsers(tweetPredictions) {
 
     return result;
 }
-

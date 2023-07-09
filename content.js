@@ -1,4 +1,60 @@
-// Predicts tweet
+// CONTENT SCRIPT
+// Manages contents within the Twitter page
+
+// Connect to the background script
+
+var port = chrome.runtime.connect({name: 'content'});
+var toggleProfanity;
+
+// Listen for messages from the background script
+port.onMessage.addListener((message) => {
+
+    // clearReportedTweets();
+
+    console.log('Received message from background script:', message);
+
+    if (message.toggleProfanity) {
+        console.log("TOGGLE", message.toggleProfanity.toggleProfanity);
+        toggleProfanity =  message.toggleProfanity.toggleProfanity;
+    }
+
+    if (message.text) {
+
+        const tweet = message;
+
+        const tweetDivs = [...document.querySelectorAll('[data-testid="tweetText"]')]
+        .filter(div => div.textContent.includes(tweet.text));
+
+        for (let i = 0; i < tweetDivs.length; i++) {
+
+            const tweetDiv = tweetDivs[i];
+
+            // Pending tweet? -> send again to background script
+            if (tweet.prediction === "Pending") {
+                tweetDiv.classList.remove('queued');
+                continue;
+            } 
+            // Abusive? -> censor
+            else if (tweet.prediction === "Abusive") {
+                if (toggleProfanity) {
+                    censorProfanity(tweetDiv, tweet.profanities)
+                }
+                else {
+                    censorTweet(tweetDiv);
+                }
+                
+            }
+            
+            if (tweet.reported === true) {
+                createReportButton(tweetDiv);
+            }
+
+            tweetDiv.classList.add('predicted');
+        }
+
+    }
+
+});
 
 
 function formatUsername(usernameDiv) {
@@ -307,63 +363,6 @@ function findTweet(listOfTweet, tweet) {
     }
   
 }
-
-
-
-// Connect to the background script
-
-var port = chrome.runtime.connect({name: 'content'});
-var toggleProfanity;
-
-// Listen for messages from the background script
-port.onMessage.addListener((message) => {
-
-    // clearReportedTweets();
-
-    console.log('Received message from background script:', message);
-
-    if (message.toggleProfanity) {
-        console.log("TOGGLE", message.toggleProfanity.toggleProfanity);
-        toggleProfanity =  message.toggleProfanity.toggleProfanity;
-    }
-
-    if (message.text) {
-
-        const tweet = message;
-
-        const tweetDivs = [...document.querySelectorAll('[data-testid="tweetText"]')]
-        .filter(div => div.textContent.includes(tweet.text));
-
-        for (let i = 0; i < tweetDivs.length; i++) {
-
-            const tweetDiv = tweetDivs[i];
-
-            // Pending tweet? -> send again to background script
-            if (tweet.prediction === "Pending") {
-                tweetDiv.classList.remove('queued');
-                continue;
-            } 
-            // Abusive? -> censor
-            else if (tweet.prediction === "Abusive") {
-                if (toggleProfanity) {
-                    censorProfanity(tweetDiv, tweet.profanities)
-                }
-                else {
-                    censorTweet(tweetDiv);
-                }
-                
-            }
-            
-            if (tweet.reported === true) {
-                createReportButton(tweetDiv);
-            }
-
-            tweetDiv.classList.add('predicted');
-        }
-
-    }
-
-});
 
 function addReportButton(tweetDiv) {
 
